@@ -249,9 +249,11 @@ const msalConfig = {
   auth: {
     clientId: AZURE.clientId,
     authority: `https://login.microsoftonline.com/${AZURE.tenantId}`,
-    redirectUri: window.location.href.split('?')[0].split('#')[0],
+    redirectUri: 'https://sutraksas.github.io/comisiones/sutraksa_azure_final.html',
+    navigateToLoginRequestUrl: false,
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true },
+  system: { loggerOptions: { loggerCallback: (l,m,c) => c && console.log(m) } }
 };
 
 const SCOPES = [
@@ -278,22 +280,17 @@ async function getToken() {
     tokenExpiry = result.expiresOn?.getTime() || (Date.now() + 3600000);
     return accessToken;
   } catch(e) {
-    // Silent failed → interactive
-    const result = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
-    accessToken = result.accessToken;
-    tokenExpiry = result.expiresOn?.getTime() || (Date.now() + 3600000);
-    return accessToken;
+    // Silent failed → redirect
+    await msalInstance.acquireTokenRedirect({ scopes: SCOPES });
+    return null; // page will reload
   }
 }
 
 async function loginMicrosoft() {
   try {
     document.getElementById('login-error').style.display = 'none';
-    const result = await msalInstance.loginPopup({ scopes: SCOPES });
-    currentUser = result.account;
-    accessToken = result.accessToken;
-    tokenExpiry = result.expiresOn?.getTime() || (Date.now() + 3600000);
-    onLoginSuccess();
+    // Use redirect flow (works from any host including GitHub Pages)
+    await msalInstance.loginRedirect({ scopes: SCOPES });
   } catch(e) {
     const errEl = document.getElementById('login-error');
     errEl.style.display = 'block';
@@ -303,8 +300,7 @@ async function loginMicrosoft() {
 
 function logout() {
   if (!confirm('¿Cerrar sesión?')) return;
-  msalInstance.logoutPopup();
-  location.reload();
+  msalInstance.logoutRedirect({ postLogoutRedirectUri: 'https://sutraksas.github.io/comisiones/sutraksa_azure_final.html' });
 }
 
 function onLoginSuccess() {
@@ -621,15 +617,30 @@ async function eliminarAsesor(c){if(!confirm(`¿Eliminar ${c}?`))return;DB.aseso
 // ── Auto-login si ya hay sesión ──────────────────────
 async function init() {
   await msalInstance.initialize();
-  // Handle redirect response (si viene de un redirect flow)
-  try { await msalInstance.handleRedirectPromise(); } catch(e) {}
+  try {
+    // Handle the redirect response after login
+    const response = await msalInstance.handleRedirectPromise();
+    if (response) {
+      currentUser = response.account;
+      accessToken = response.accessToken;
+      tokenExpiry = response.expiresOn?.getTime() || (Date.now() + 3600000);
+      DB = loadLocalCache() || emptyDB();
+      onLoginSuccess();
+      return;
+    }
+  } catch(e) {
+    console.error('Redirect error:', e);
+    const errEl = document.getElementById('login-error');
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Error: ' + e.message; }
+  }
+  // Check if already logged in
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length > 0) {
     currentUser = accounts[0];
     DB = loadLocalCache() || emptyDB();
     onLoginSuccess();
   }
-  // Si no hay sesión, la pantalla de login ya está visible
+  // Otherwise login screen is already visible
 }
 init();
 </script>
