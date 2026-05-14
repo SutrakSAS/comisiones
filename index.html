@@ -549,6 +549,7 @@ async function runCloudAction(label, fn) {
   try {
     await fn();
     saveDB(DB);
+    await saveDBToSharePointFile();
     setSyncStatus('ok', 'SharePoint ✓');
     return true;
   } catch (e) {
@@ -1526,7 +1527,7 @@ const _AZ = {
   siteHost:   "sutraksa.sharepoint.com",
   sitePath:   "/sites/sutrakserver",
   redirect:   "https://sutraksas.github.io/comisiones/index.html",
-  scopes:     "openid profile email offline_access Sites.ReadWrite.All Sites.Manage.All",
+  scopes:     "openid profile email offline_access Sites.ReadWrite.All Files.ReadWrite.All",
   authority:  "https://login.microsoftonline.com/437254d0-64b3-4dc3-9684-275c2995547a",
 };
 
@@ -1651,6 +1652,25 @@ async function _graph(method,path,body){
   return r.json();
 }
 
+async function _graphContent(method,path,body){
+  var tok=await getToken();
+  if(!tok)return null;
+  var url=path.startsWith('https://')?path:'https://graph.microsoft.com/v1.0'+path;
+  var opts={method:method,headers:{'Authorization':'Bearer '+tok}};
+  if(body!==undefined){
+    opts.headers['Content-Type']='application/json;charset=utf-8';
+    opts.body=typeof body==='string'?body:JSON.stringify(body);
+  }
+  var r=await fetch(url,opts);
+  if(r.status===404)return null;
+  if(!r.ok){
+    var txt=await r.text().catch(function(){return'';});
+    try{var e=JSON.parse(txt);throw new Error((e.error&&e.error.message)||txt||'HTTP '+r.status);}
+    catch(_){throw new Error(txt||'HTTP '+r.status);}
+  }
+  return r.text();
+}
+
 async function _getSiteId(){
   if(_siteId)return _siteId;
   localStorage.removeItem('sutrak_siteid'); // Force fresh lookup
@@ -1660,6 +1680,20 @@ async function _getSiteId(){
   if(!d){console.error('Failed to get site ID');return null;}
   console.log('Site ID obtained:', d.id);
   _siteId=d.id; localStorage.setItem('sutrak_siteid',_siteId); return _siteId;
+}
+
+var _DB_FILE='ComisionesSutrak_db.json';
+
+async function loadDBFromSharePointFile(){
+  var sid=await _getSiteId();
+  var txt=await _graphContent('GET','/sites/'+sid+'/drive/root:/'+_DB_FILE+':/content');
+  if(!txt)return null;
+  return normalizeDB(JSON.parse(txt));
+}
+
+async function saveDBToSharePointFile(){
+  var sid=await _getSiteId();
+  await _graphContent('PUT','/sites/'+sid+'/drive/root:/'+_DB_FILE+':/content',JSON.stringify(normalizeDB(DB),null,2));
 }
 
 var _LC={SutrakOrdenes:[{name:'numero_s',text:{}},{name:'nombre_proyecto',text:{}},{name:'cliente',text:{}},{name:'codigo_asesor',text:{}},{name:'valor_venta',number:{}},{name:'pct_dcto',number:{}},{name:'facturas',text:{}},{name:'fecha',text:{}},{name:'tipo_asesor',text:{}}],SutrakIngresos:[{name:'numero_s',text:{}},{name:'fecha',text:{}},{name:'valor',number:{}},{name:'referencia',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakPagosComision:[{name:'codigo_asesor',text:{}},{name:'numero_s',text:{}},{name:'valor',number:{}},{name:'fecha',text:{}},{name:'periodo',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakConfig:[{name:'clave',text:{}},{name:'valor',text:{allowMultipleLines:true}}]};
@@ -1719,18 +1753,14 @@ function setSyncStatus(st,txt){
 async function syncFromSharePoint(){
   setSyncStatus('syncing','Sincronizando...');
   try{
-    var sid=await _getSiteId();
-    var lists=['SutrakOrdenes','SutrakIngresos','SutrakPagosComision','SutrakConfig'];
-    for(var li=0;li<lists.length;li++)await _ensureList(sid,lists[li]);
-    var ord=await _listItems(sid,_listIds.SutrakOrdenes);
-    var ing=await _listItems(sid,_listIds.SutrakIngresos);
-    var pag=await _listItems(sid,_listIds.SutrakPagosComision);
-    var cfg=await _listItems(sid,_listIds.SutrakConfig);
-    var spEmpty=ord.length===0&&ing.length===0&&pag.length===0;
+    var cloudDB=await loadDBFromSharePointFile();
+    var spEmpty=!cloudDB||(
+      cloudDB.ordenes.length===0&&cloudDB.ingresos.length===0&&cloudDB.pagos_comision.length===0
+    );
     var localHasData=DB.ordenes.length>0||DB.ingresos.length>0||DB.pagos_comision.length>0;
     if(spEmpty&&localHasData){
       if(confirm('SharePoint está vacío y este navegador tiene datos locales. ¿Quieres cargar estos datos a SharePoint ahora?')){
-        await pushAllToSharePoint();
+        await saveDBToSharePointFile();
         setSyncStatus('ok','SharePoint ✓');
         toast('SharePoint inicializado con los datos locales');
         return;
@@ -1739,13 +1769,7 @@ async function syncFromSharePoint(){
       toast('Sincronización cancelada para no pisar los datos locales','warn');
       return;
     }
-    DB.ordenes=ord.map(_sO);
-    DB.ingresos=ing.map(_sI);
-    DB.pagos_comision=pag.map(_sP);
-    var pRow=cfg.find(function(r){return r.clave==='periodo_actual';});
-    if(pRow)DB.periodo_actual=pRow.valor;
-    var aRow=cfg.find(function(r){return r.clave==='asesores';});
-    if(aRow)try{DB.asesores=JSON.parse(aRow.valor);}catch(e){}
+    if(cloudDB)DB=cloudDB;
     saveDB(DB);
     setSyncStatus('ok','SharePoint ✓');
     toast('Datos sincronizados desde SharePoint');
@@ -1757,55 +1781,29 @@ async function syncFromSharePoint(){
 }
 
 async function spSaveOrden(o,isNew){
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakOrdenes');
-  if(isNew){var r=await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:_oSp(o)});o._spId=r.id;}
-  else if(o._spId)await _graph('PATCH','/sites/'+sid+'/lists/'+lid+'/items/'+o._spId+'/fields',_oSp(o));
-  saveDB(DB);
+  return;
 }
 async function spSaveIngreso(i){
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakIngresos');
-  var r=await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:_iSp(i)});
-  i._spId=r.id; saveDB(DB);
+  return;
 }
 async function spSavePago(p){
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakPagosComision');
-  var r=await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:_pSp(p)});
-  p._spId=r.id; saveDB(DB);
+  return;
 }
 async function spDelOrden(o){
-  if(!o._spId)return;
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakOrdenes');
-  await _graph('DELETE','/sites/'+sid+'/lists/'+lid+'/items/'+o._spId);
-  saveDB(DB);
+  return;
 }
 async function spDelIngreso(i){
-  if(!i._spId)return;
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakIngresos');
-  await _graph('DELETE','/sites/'+sid+'/lists/'+lid+'/items/'+i._spId);
-  saveDB(DB);
+  return;
 }
 async function spDelPago(p){
-  if(!p._spId)return;
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakPagosComision');
-  await _graph('DELETE','/sites/'+sid+'/lists/'+lid+'/items/'+p._spId);
-  saveDB(DB);
+  return;
 }
 async function spSaveCfg(clave,valor){
-  var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakConfig');
-  var rows=await _listItems(sid,lid);
-  var ex=rows.find(function(r){return r.clave===clave;});
-  if(ex)await _graph('PATCH','/sites/'+sid+'/lists/'+lid+'/items/'+ex._spId+'/fields',{Title:clave,clave:clave,valor:valor});
-  else await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:{Title:clave,clave:clave,valor:valor}});
+  return;
 }
 
 async function pushAllToSharePoint(){
-  for(const o of DB.ordenes){delete o._spId; await spSaveOrden(o,true);}
-  for(const i of DB.ingresos) delete i._spId;
-  for(const p of DB.pagos_comision) delete p._spId;
-  for(const i of DB.ingresos) await spSaveIngreso(i);
-  for(const p of DB.pagos_comision) await spSavePago(p);
-  await spSaveCfg('periodo_actual',DB.periodo_actual);
-  await spSaveCfg('asesores',JSON.stringify(DB.asesores));
+  await saveDBToSharePointFile();
 }
 
 function _showApp(){
