@@ -1665,7 +1665,7 @@ async function _getSiteId(){
 var _LC={SutrakOrdenes:[{name:'numero_s',text:{}},{name:'nombre_proyecto',text:{}},{name:'cliente',text:{}},{name:'codigo_asesor',text:{}},{name:'valor_venta',number:{}},{name:'pct_dcto',number:{}},{name:'facturas',text:{}},{name:'fecha',text:{}},{name:'tipo_asesor',text:{}}],SutrakIngresos:[{name:'numero_s',text:{}},{name:'fecha',text:{}},{name:'valor',number:{}},{name:'referencia',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakPagosComision:[{name:'codigo_asesor',text:{}},{name:'numero_s',text:{}},{name:'valor',number:{}},{name:'fecha',text:{}},{name:'periodo',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakConfig:[{name:'clave',text:{}},{name:'valor',text:{allowMultipleLines:true}}]};
 
 async function _ensureList(sid,name){
-  if(_listIds[name])return _listIds[name];
+  if(_listIds[name]){await _ensureColumns(sid,_listIds[name],name);return _listIds[name];}
   var c=JSON.parse(localStorage.getItem('sutrak_listids')||'{}');
   if(c[name]){_listIds=c;await _ensureColumns(sid,_listIds[name],name);return _listIds[name];}
   var r=await _graph('GET','/sites/'+sid+'/lists?$filter=displayName eq \''+name+'\'');
