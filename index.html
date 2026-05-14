@@ -1662,17 +1662,35 @@ async function _getSiteId(){
   _siteId=d.id; localStorage.setItem('sutrak_siteid',_siteId); return _siteId;
 }
 
-var _LC={SutrakOrdenes:[{name:'numero_s',text:{}},{name:'nombre_proyecto',text:{}},{name:'cliente',text:{}},{name:'codigo_asesor',text:{}},{name:'valor_venta',number:{}},{name:'pct_dcto',number:{}},{name:'facturas',text:{}},{name:'fecha',text:{}},{name:'tipo_asesor',text:{}}],SutrakIngresos:[{name:'numero_s',text:{}},{name:'fecha',text:{}},{name:'valor',number:{}},{name:'referencia',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakPagosComision:[{name:'codigo_asesor',text:{}},{name:'numero_s',text:{}},{name:'valor',number:{}},{name:'fecha',text:{}},{name:'periodo',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakConfig:[{name:'clave',text:{}},{name:'valor',text:{}}]};
+var _LC={SutrakOrdenes:[{name:'numero_s',text:{}},{name:'nombre_proyecto',text:{}},{name:'cliente',text:{}},{name:'codigo_asesor',text:{}},{name:'valor_venta',number:{}},{name:'pct_dcto',number:{}},{name:'facturas',text:{}},{name:'fecha',text:{}},{name:'tipo_asesor',text:{}}],SutrakIngresos:[{name:'numero_s',text:{}},{name:'fecha',text:{}},{name:'valor',number:{}},{name:'referencia',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakPagosComision:[{name:'codigo_asesor',text:{}},{name:'numero_s',text:{}},{name:'valor',number:{}},{name:'fecha',text:{}},{name:'periodo',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakConfig:[{name:'clave',text:{}},{name:'valor',text:{allowMultipleLines:true}}]};
 
 async function _ensureList(sid,name){
   if(_listIds[name])return _listIds[name];
   var c=JSON.parse(localStorage.getItem('sutrak_listids')||'{}');
-  if(c[name]){_listIds=c;return _listIds[name];}
+  if(c[name]){_listIds=c;await _ensureColumns(sid,_listIds[name],name);return _listIds[name];}
   var r=await _graph('GET','/sites/'+sid+'/lists?$filter=displayName eq \''+name+'\'');
   var id;
   if(r.value&&r.value.length>0){id=r.value[0].id;}
   else{var cr=await _graph('POST','/sites/'+sid+'/lists',{displayName:name,list:{template:'genericList'},columns:_LC[name]||[]});id=cr.id;}
+  await _ensureColumns(sid,id,name);
   _listIds[name]=id; localStorage.setItem('sutrak_listids',JSON.stringify(_listIds)); return id;
+}
+
+async function _ensureColumns(sid,lid,name){
+  var defs=_LC[name]||[];
+  if(!defs.length)return;
+  var cols=await _graph('GET','/sites/'+sid+'/lists/'+lid+'/columns?$select=name,displayName');
+  var names=(cols.value||[]).map(function(c){return (c.name||c.displayName||'').toLowerCase();});
+  for(var i=0;i<defs.length;i++){
+    var def=defs[i], colName=def.name.toLowerCase();
+    if(names.indexOf(colName)>=0)continue;
+    try{
+      await _graph('POST','/sites/'+sid+'/lists/'+lid+'/columns',def);
+      names.push(colName);
+    }catch(e){
+      if(!/already exists|duplicate/i.test(e.message||''))throw e;
+    }
+  }
 }
 
 async function _listItems(sid,lid){
@@ -1688,9 +1706,9 @@ async function _listItems(sid,lid){
 function _sO(r){return{_spId:r._spId,numero_s:r.numero_s,nombre_proyecto:r.nombre_proyecto,cliente:r.cliente,codigo_asesor:r.codigo_asesor,valor_venta:parseFloat(r.valor_venta)||0,pct_dcto:parseFloat(r.pct_dcto)||0,facturas:r.facturas,fecha:r.fecha,tipo_asesor:r.tipo_asesor||'directo'};}
 function _sI(r){return{_spId:r._spId,id:r.uid||r._spId,numero_s:r.numero_s,fecha:r.fecha,valor:parseFloat(r.valor)||0,referencia:r.referencia,notas:r.notas};}
 function _sP(r){return{_spId:r._spId,id:r.uid||r._spId,codigo_asesor:r.codigo_asesor,numero_s:r.numero_s,valor:parseFloat(r.valor)||0,fecha:r.fecha,periodo:r.periodo,notas:r.notas};}
-function _oSp(o){return{numero_s:o.numero_s,nombre_proyecto:o.nombre_proyecto,cliente:o.cliente||'',codigo_asesor:o.codigo_asesor,valor_venta:o.valor_venta,pct_dcto:o.pct_dcto,facturas:o.facturas||'',fecha:o.fecha||'',tipo_asesor:o.tipo_asesor||'directo'};}
-function _iSp(i){return{numero_s:i.numero_s,fecha:i.fecha||'',valor:i.valor,referencia:i.referencia||'',notas:i.notas||'',uid:i.id};}
-function _pSp(p){return{codigo_asesor:p.codigo_asesor,numero_s:p.numero_s||'',valor:p.valor,fecha:p.fecha||'',periodo:p.periodo||'',notas:p.notas||'',uid:p.id};}
+function _oSp(o){return{Title:o.numero_s||'Orden',numero_s:o.numero_s,nombre_proyecto:o.nombre_proyecto,cliente:o.cliente||'',codigo_asesor:o.codigo_asesor,valor_venta:o.valor_venta,pct_dcto:o.pct_dcto,facturas:o.facturas||'',fecha:o.fecha||'',tipo_asesor:o.tipo_asesor||'directo'};}
+function _iSp(i){return{Title:i.numero_s||'Recaudo',numero_s:i.numero_s,fecha:i.fecha||'',valor:i.valor,referencia:i.referencia||'',notas:i.notas||'',uid:i.id};}
+function _pSp(p){return{Title:(p.codigo_asesor||'Pago')+' '+(p.periodo||''),codigo_asesor:p.codigo_asesor,numero_s:p.numero_s||'',valor:p.valor,fecha:p.fecha||'',periodo:p.periodo||'',notas:p.notas||'',uid:p.id};}
 
 function setSyncStatus(st,txt){
   var d=document.getElementById('sync-dot'),t=document.getElementById('sync-status-text');
@@ -1776,8 +1794,8 @@ async function spSaveCfg(clave,valor){
   var sid=await _getSiteId(),lid=await _ensureList(sid,'SutrakConfig');
   var rows=await _listItems(sid,lid);
   var ex=rows.find(function(r){return r.clave===clave;});
-  if(ex)await _graph('PATCH','/sites/'+sid+'/lists/'+lid+'/items/'+ex._spId+'/fields',{clave:clave,valor:valor});
-  else await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:{clave:clave,valor:valor}});
+  if(ex)await _graph('PATCH','/sites/'+sid+'/lists/'+lid+'/items/'+ex._spId+'/fields',{Title:clave,clave:clave,valor:valor});
+  else await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:{Title:clave,clave:clave,valor:valor}});
 }
 
 async function pushAllToSharePoint(){
