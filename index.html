@@ -430,13 +430,25 @@ function getPctComision(dcto) {
   return found.pct;
 }
 
+const EMPTY_DB = {asesores: ASESORES_DEFAULT, ordenes: [], ingresos: [], pagos_comision: [], liquidaciones: [], periodo_actual: new Date().toISOString().slice(0,7)};
+function normalizeDB(db) {
+  const base = JSON.parse(JSON.stringify(EMPTY_DB));
+  const merged = Object.assign(base, db || {});
+  merged.asesores = Array.isArray(merged.asesores) && merged.asesores.length ? merged.asesores : ASESORES_DEFAULT.slice();
+  merged.ordenes = Array.isArray(merged.ordenes) ? merged.ordenes : [];
+  merged.ingresos = Array.isArray(merged.ingresos) ? merged.ingresos : [];
+  merged.pagos_comision = Array.isArray(merged.pagos_comision) ? merged.pagos_comision : [];
+  merged.liquidaciones = Array.isArray(merged.liquidaciones) ? merged.liquidaciones : [];
+  merged.periodo_actual = merged.periodo_actual || new Date().toISOString().slice(0,7);
+  return merged;
+}
 function loadDB() {
-  try { const r = localStorage.getItem(DB_KEY); if (r) return JSON.parse(r); } catch(e){}
-  const d = {"asesores": [{"codigo": "A1", "nombre": "Jennifer Lopez", "tipo": "directo", "activo": true}, {"codigo": "A2", "nombre": "Nicolas Arbelaez", "tipo": "directo", "activo": true}, {"codigo": "A3", "nombre": "Juan Sebastian Lopez", "tipo": "directo", "activo": true}, {"codigo": "A4J", "nombre": "Javier Orlando Guerrero", "tipo": "directo", "activo": true}, {"codigo": "A10", "nombre": "Martin Angelo Nieto", "tipo": "soporte", "activo": true}], "ordenes": [{"numero_s": "S05157", "nombre_proyecto": "PLANTA DE PROCESOS CARNICOS", "cliente": "DISTRIBUIDORA DE CARNES ET LOS MONOS SAS", "codigo_asesor": "A4J", "valor_venta": 5858859627.0, "pct_dcto": 0.08, "facturas": "", "fecha": "2025-10-24", "tipo_asesor": "directo"}, {"numero_s": "S04826", "nombre_proyecto": "AMPLIACION", "cliente": "FRIGOPORCINOS BELLO SAS", "codigo_asesor": "A4J", "valor_venta": 333111762.0, "pct_dcto": 0.03, "facturas": "", "fecha": "2025-08-12", "tipo_asesor": "directo"}, {"numero_s": "S05346", "nombre_proyecto": "HUB CHAPINERO", "cliente": "MUNCHER S.A.S.", "codigo_asesor": "A4J", "valor_venta": 51697957.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2026-01-08", "tipo_asesor": "directo"}, {"numero_s": "S05581", "nombre_proyecto": "CUARTO DUPLEX", "cliente": "KEFI GROUP S.A.S", "codigo_asesor": "A4J", "valor_venta": 76991312.3, "pct_dcto": 0.02, "facturas": "", "fecha": "2026-03-04", "tipo_asesor": "directo"}, {"numero_s": "S04665", "nombre_proyecto": "CUARTO DE RESIDUOS HUMANOS", "cliente": "ECOLOGISTICA S.A.S. EMPRESA DE SERVICIOS PÚBLICOS- ECOLOGISTICA S.A.S-E.S.P.", "codigo_asesor": "A1", "valor_venta": 57923844.7, "pct_dcto": 0.03, "facturas": "", "fecha": "2025-07-02", "tipo_asesor": "directo"}, {"numero_s": "S05057", "nombre_proyecto": "CUARTOS CAMPAMENTO", "cliente": "FUNDACION CAMPAMENTO MONTEVERDE", "codigo_asesor": "A1", "valor_venta": 180832757.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2025-10-01", "tipo_asesor": "directo"}, {"numero_s": "S05172", "nombre_proyecto": "ZONA BINES - ENVIGADO", "cliente": "ALIMENTOS CARNICOS S.A.S.", "codigo_asesor": "A1", "valor_venta": 64029686.4, "pct_dcto": 0.04, "facturas": "", "fecha": "2025-10-29", "tipo_asesor": "directo"}, {"numero_s": "S05025", "nombre_proyecto": "AGUACHICA CAVAS 1 A 6", "cliente": "ALIMENTOS CARNICOS S.A.S.", "codigo_asesor": "A1", "valor_venta": 274243029.0, "pct_dcto": 0.04, "facturas": "", "fecha": "2025-09-26", "tipo_asesor": "directo"}, {"numero_s": "S04436", "nombre_proyecto": "PUNTO DE VENTA TURBACO", "cliente": "ANTIOQUEÑA DE PORCINOS S.A.S", "codigo_asesor": "A1", "valor_venta": 278880013.0, "pct_dcto": 0.1, "facturas": "", "fecha": "2025-05-12", "tipo_asesor": "directo"}, {"numero_s": "S04991", "nombre_proyecto": "SUMINISTRO CO2", "cliente": "AVO PAK S.A.S.", "codigo_asesor": "A1", "valor_venta": 1280147829.0, "pct_dcto": 0.06, "facturas": "", "fecha": "2025-09-18", "tipo_asesor": "directo"}, {"numero_s": "S05309", "nombre_proyecto": "PUNTO DE VENTA LOS COLORES", "cliente": "ANTIOQUEÑA DE PORCINOS S.A.S", "codigo_asesor": "A1", "valor_venta": 222965280.0, "pct_dcto": 0.1, "facturas": "", "fecha": "2025-12-18", "tipo_asesor": "directo"}, {"numero_s": "S04549", "nombre_proyecto": "WOK", "cliente": "LAO KAO S.A.", "codigo_asesor": "A2", "valor_venta": 411048897.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2025-06-09", "tipo_asesor": "directo"}, {"numero_s": "S05295", "nombre_proyecto": "CAVA DE QUESOS", "cliente": "GRUPO ZANTO S.A.S.", "codigo_asesor": "A2", "valor_venta": 77048250.5, "pct_dcto": 0.0, "facturas": "", "fecha": "2025-12-15", "tipo_asesor": "directo"}, {"numero_s": "S05188", "nombre_proyecto": "COLEGIOS", "cliente": "CORPORACION EDUCATIVA BILINGUE DE SANTA MARTA", "codigo_asesor": "A2", "valor_venta": 136390061.0, "pct_dcto": 0.02, "facturas": "", "fecha": "2025-11-04", "tipo_asesor": "directo"}, {"numero_s": "S05320", "nombre_proyecto": "PUERTO ANTIOQUIA", "cliente": "INGENIEROS DE ANTIOQUIA S.A.S", "codigo_asesor": "A3", "valor_venta": 2473763063.0, "pct_dcto": 0.1, "facturas": "", "fecha": "2025-12-23", "tipo_asesor": "directo"}, {"numero_s": "S03855", "nombre_proyecto": "DIVISIONES PLANTA", "cliente": "PROCESADORA NACIONAL DE CEREALES S.A.", "codigo_asesor": "A3", "valor_venta": 81451133.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2024-12-18", "tipo_asesor": "directo"}, {"numero_s": "S05417", "nombre_proyecto": "PLANTA DE LACTEOS", "cliente": "FASALACT SAS", "codigo_asesor": "A3", "valor_venta": 17950655.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2026-01-22", "tipo_asesor": "directo"}, {"numero_s": "S05450", "nombre_proyecto": "LIBRE DE CULPA", "cliente": "PASTELERIA SALUDABLE LIBRE DE CULPA SAS", "codigo_asesor": "A3", "valor_venta": 103168674.0, "pct_dcto": 0.08, "facturas": "", "fecha": "2026-01-30", "tipo_asesor": "directo"}, {"numero_s": "S05548", "nombre_proyecto": "CUARTO FRIO", "cliente": "ECOFLORA S.A.S", "codigo_asesor": "A3", "valor_venta": 183863646.0, "pct_dcto": 0.06, "facturas": "", "fecha": "2026-02-23", "tipo_asesor": "directo"}, {"numero_s": "S05651", "nombre_proyecto": "ENRIPAN", "cliente": "ARQUITECTURA PARA ALIMENTOS S.A.S.", "codigo_asesor": "A3", "valor_venta": 117318644.0, "pct_dcto": 0.1, "facturas": "", "fecha": "2026-03-21", "tipo_asesor": "directo"}, {"numero_s": "S05508", "nombre_proyecto": "CEDI MEDELLIN", "cliente": "RAMEDICAS S.A.S", "codigo_asesor": "A3", "valor_venta": 248410986.0, "pct_dcto": 0.1, "facturas": "", "fecha": "2026-02-12", "tipo_asesor": "directo"}, {"numero_s": "S05748", "nombre_proyecto": "COCINA", "cliente": "TREAT BAKERY S.A.S.", "codigo_asesor": "A3", "valor_venta": 164062316.0, "pct_dcto": 0.0, "facturas": "", "fecha": "2026-04-20", "tipo_asesor": "directo"}], "ingresos": [{"id": "REC0000", "numero_s": "S05157", "fecha": "2026-03-09", "valor": 585842849.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0001", "numero_s": "S05157", "fecha": "2026-02-25", "valor": 585842849.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0002", "numero_s": "S05157", "fecha": "2025-11-28", "valor": 2929214247.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0003", "numero_s": "S04826", "fecha": "2025-12-22", "valor": 166555881.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0004", "numero_s": "S05346", "fecha": "2026-03-20", "valor": 5168795.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0005", "numero_s": "S05346", "fecha": "2026-03-16", "valor": 5169795.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0006", "numero_s": "S05346", "fecha": "2026-03-06", "valor": 5169795.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0007", "numero_s": "S05346", "fecha": "2026-03-04", "valor": 5169795.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0008", "numero_s": "S05346", "fecha": "2026-02-23", "valor": 5169795.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0009", "numero_s": "S05346", "fecha": "2026-02-09", "valor": 15509387.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0010", "numero_s": "S05581", "fecha": "2026-04-23", "valor": 36748692.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0011", "numero_s": "S04665", "fecha": "2026-04-24", "valor": 16508768.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0012", "numero_s": "S04665", "fecha": "2026-04-10", "valor": 16508769.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0013", "numero_s": "S04665", "fecha": "2025-12-18", "valor": 34465675.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0014", "numero_s": "S05057", "fecha": "2026-02-12", "valor": 36166551.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0015", "numero_s": "S05057", "fecha": "2026-02-09", "valor": 36166552.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0016", "numero_s": "S05057", "fecha": "2026-01-06", "valor": 54249827.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0017", "numero_s": "S05172", "fecha": "2026-04-07", "valor": 32014844.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0018", "numero_s": "S05172", "fecha": "2025-11-19", "valor": 19208907.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0019", "numero_s": "S05025", "fecha": "2026-02-17", "valor": 137121515.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0020", "numero_s": "S05025", "fecha": "2025-11-19", "valor": 82272909.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0021", "numero_s": "S04436", "fecha": "2025-12-09", "valor": 83664004.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0022", "numero_s": "S04436", "fecha": "2025-09-08", "valor": 139440006.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0023", "numero_s": "S04991", "fecha": "2025-11-26", "valor": 190250908.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0024", "numero_s": "S04991", "fecha": "2025-11-19", "valor": 186821437.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0025", "numero_s": "S04991", "fecha": "2025-09-24", "valor": 357478043.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0026", "numero_s": "S04991", "fecha": "2025-09-19", "valor": 38925.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0027", "numero_s": "S05309", "fecha": "2026-03-10", "valor": 112709252.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0028", "numero_s": "S05309", "fecha": "2026-03-25", "valor": 67625551.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0029", "numero_s": "S04549", "fecha": "2026-04-24", "valor": 8910493.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0030", "numero_s": "S04549", "fecha": "2026-03-27", "valor": 50000000.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0031", "numero_s": "S04549", "fecha": "2026-01-27", "valor": 121492860.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0032", "numero_s": "S04549", "fecha": "2025-10-28", "valor": 202488101.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0033", "numero_s": "S05295", "fecha": "2026-03-06", "valor": 39418203.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0034", "numero_s": "S05188", "fecha": "2026-03-26", "valor": 68119831.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0035", "numero_s": "S05320", "fecha": "2026-02-16", "valor": 1236881531.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0036", "numero_s": "S03855", "fecha": "2026-02-02", "valor": 9465815.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0037", "numero_s": "S03855", "fecha": "2025-04-25", "valor": 11000000.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0038", "numero_s": "S03855", "fecha": "2025-04-07", "valor": 11000000.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0039", "numero_s": "S03855", "fecha": "2025-03-04", "valor": 19000000.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0040", "numero_s": "S03855", "fecha": "2025-02-14", "valor": 20000000.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0041", "numero_s": "S05417", "fecha": "2026-04-17", "valor": 20912513.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0042", "numero_s": "S05450", "fecha": "2026-03-20", "valor": 51584336.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0043", "numero_s": "S05548", "fecha": "2026-03-12", "valor": 90427581.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0044", "numero_s": "S05651", "fecha": "2026-04-07", "valor": 59518102.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0045", "numero_s": "S05508", "fecha": "2026-04-09", "valor": 141152357.0, "referencia": "ANTICIPO", "notas": ""}, {"id": "REC0046", "numero_s": "S05748", "fecha": "2026-04-21", "valor": 100000000.0, "referencia": "ANTICIPO", "notas": ""}], "pagos_comision": [{"id": "PAG0000", "codigo_asesor": "A4J", "numero_s": "S05157", "valor": 17575285.0, "fecha": "2025-11-10", "periodo": "2026-12", "notas": "Anticipo 50%"}, {"id": "PAG0001", "codigo_asesor": "A4J", "numero_s": "S05157", "valor": 3515057.0, "fecha": "2026-02-25", "periodo": "2026-03", "notas": "Avance 10%"}, {"id": "PAG0002", "codigo_asesor": "A4J", "numero_s": "S05157", "valor": 3515057.0, "fecha": "2026-03-15", "periodo": "2026-03", "notas": "Avance  10%"}, {"id": "PAG0003", "codigo_asesor": "A4J", "numero_s": "S04826", "valor": 1565624.0, "fecha": "2025-11-18", "periodo": "2026-01", "notas": "Anticipo 50%"}, {"id": "PAG0004", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 54283.0, "fecha": "2026-02-27", "periodo": "2026-03", "notas": "Avance"}, {"id": "PAG0005", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 54283.0, "fecha": "2026-06-03", "periodo": "2026-03", "notas": "Avance"}, {"id": "PAG0006", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 54283.0, "fecha": "2025-06-13", "periodo": "2026-03", "notas": "Avance"}, {"id": "PAG0007", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 54283.0, "fecha": "2025-06-23", "periodo": "2026-03", "notas": "Avance"}, {"id": "PAG0008", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 54283.0, "fecha": "2026-03-27", "periodo": "2026-04", "notas": "Avance"}, {"id": "PAG0009", "codigo_asesor": "A4J", "numero_s": "S05581", "valor": 286921.0, "fecha": "2026-04-23", "periodo": "2026-04", "notas": "Anticipo 50%"}, {"id": "PAG0010", "codigo_asesor": "A1", "numero_s": "S04665", "valor": 172328.0, "fecha": "2025-12-18", "periodo": "2026-01", "notas": "Anticipo"}, {"id": "PAG0011", "codigo_asesor": "A1", "numero_s": "S04665", "valor": 82544.0, "fecha": "2026-04-10", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0012", "codigo_asesor": "A1", "numero_s": "S05057", "valor": 569623.0, "fecha": "2026-01-06", "periodo": "2026-01", "notas": "Anticipo"}, {"id": "PAG0013", "codigo_asesor": "A1", "numero_s": "S05057", "valor": 379749.0, "fecha": "2026-01-09", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0014", "codigo_asesor": "A1", "numero_s": "S05057", "valor": 379749.0, "fecha": "2026-02-12", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0015", "codigo_asesor": "A1", "numero_s": "S05172", "valor": 96004.0, "fecha": "2025-11-19", "periodo": "2025-11", "notas": "Anticipo"}, {"id": "PAG0016", "codigo_asesor": "A1", "numero_s": "S05172", "valor": 160074.0, "fecha": "2026-04-07", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0017", "codigo_asesor": "A1", "numero_s": "S05025", "valor": 411365.0, "fecha": "2025-11-19", "periodo": "2025-11", "notas": "Anticipo"}, {"id": "PAG0018", "codigo_asesor": "A1", "numero_s": "S05025", "valor": 685608.0, "fecha": "2026-02-11", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0019", "codigo_asesor": "A1", "numero_s": "S04436", "valor": 697200.0, "fecha": "2025-09-08", "periodo": "2025-09", "notas": "Anticipo"}, {"id": "PAG0020", "codigo_asesor": "A1", "numero_s": "S04436", "valor": 404136.0, "fecha": "2025-11-11", "periodo": "2025-11", "notas": "Anticipo"}, {"id": "PAG0021", "codigo_asesor": "A1", "numero_s": "S04991", "valor": 3145930.0, "fecha": "2025-09-24", "periodo": "2025-10", "notas": "Anticipo"}, {"id": "PAG0022", "codigo_asesor": "A1", "numero_s": "S04991", "valor": 1656160.0, "fecha": "2025-11-18", "periodo": "2025-11", "notas": "Anticipo"}, {"id": "PAG0023", "codigo_asesor": "A1", "numero_s": "S04991", "valor": 1675960.0, "fecha": "2025-11-24", "periodo": "2025-12", "notas": "Anticipo"}, {"id": "PAG0024", "codigo_asesor": "A1", "numero_s": "S05309", "valor": 563546.0, "fecha": "2026-03-10", "periodo": "2026-03", "notas": "Anticipo"}, {"id": "PAG0025", "codigo_asesor": "A1", "numero_s": "S05309", "valor": 338128.0, "fecha": "2026-03-25", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0026", "codigo_asesor": "A1", "numero_s": "S05309", "valor": 28669.0, "fecha": "2026-02-27", "periodo": "2026-03", "notas": "Anticipo"}, {"id": "PAG0027", "codigo_asesor": "A2", "numero_s": "S04549", "valor": 2126125.0, "fecha": "2025-10-28", "periodo": "2025-11", "notas": "Anticipo"}, {"id": "PAG0028", "codigo_asesor": "A2", "numero_s": "S04549", "valor": 1275675.0, "fecha": "2026-01-27", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0029", "codigo_asesor": "A2", "numero_s": "S04549", "valor": 525000.0, "fecha": "2026-03-27", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0030", "codigo_asesor": "A2", "numero_s": "S05295", "valor": 413891.0, "fecha": "2026-03-05", "periodo": "2026-03", "notas": "Anticipo"}, {"id": "PAG0031", "codigo_asesor": "A2", "numero_s": "S05188", "valor": 667574.0, "fecha": "2026-03-26", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0032", "codigo_asesor": "A3", "numero_s": "S05320", "valor": 5627811.0, "fecha": "2026-02-16", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0033", "codigo_asesor": "A3", "numero_s": "S03855", "valor": 83299.0, "fecha": "2026-02-02", "periodo": "2026-02", "notas": "Anticipo"}, {"id": "PAG0034", "codigo_asesor": "A3", "numero_s": "S05417", "valor": 188482.0, "fecha": "2026-04-18", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0035", "codigo_asesor": "A3", "numero_s": "S05450", "valor": 309506.0, "fecha": "2024-03-20", "periodo": "2026-03", "notas": "Anticipo"}, {"id": "PAG0036", "codigo_asesor": "A3", "numero_s": "S05548", "valor": 374370.0, "fecha": "2026-03-12", "periodo": "2026-03", "notas": "Anticipo"}, {"id": "PAG0037", "codigo_asesor": "A3", "numero_s": "S05651", "valor": 523759.0, "fecha": "2026-04-07", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0038", "codigo_asesor": "A3", "numero_s": "S05508", "valor": 620996.0, "fecha": "2026-04-09", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0039", "codigo_asesor": "A3", "numero_s": "S05748", "valor": 880000.0, "fecha": "2026-04-21", "periodo": "2026-04", "notas": "Anticipo"}, {"id": "PAG0040", "codigo_asesor": "A4J", "numero_s": "S04826", "valor": 1, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0041", "codigo_asesor": "A4J", "numero_s": "S05346", "valor": 162837, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0042", "codigo_asesor": "A4J", "numero_s": "S05581", "valor": 73216, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0043", "codigo_asesor": "A1", "numero_s": "S04665", "valor": 379470, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0044", "codigo_asesor": "A1", "numero_s": "S05172", "valor": 210058, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0045", "codigo_asesor": "A1", "numero_s": "S05025", "valor": 899516, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0046", "codigo_asesor": "A1", "numero_s": "S04436", "valor": 14184, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0047", "codigo_asesor": "A2", "numero_s": "S04549", "valor": 93560, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0048", "codigo_asesor": "A3", "numero_s": "S05320", "valor": 556597, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0049", "codigo_asesor": "A3", "numero_s": "S03855", "valor": 656592, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0050", "codigo_asesor": "A3", "numero_s": "S05417", "valor": 31099, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0051", "codigo_asesor": "A3", "numero_s": "S05548", "valor": 330965, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0052", "codigo_asesor": "A3", "numero_s": "S05508", "valor": 84766, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0053", "codigo_asesor": "A3", "numero_s": "S05748", "valor": 170000, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa automática"}, {"id": "PAG0054", "codigo_asesor": "A10", "numero_s": "", "valor": 8209646, "fecha": "2026-04-30", "periodo": "2026-04", "notas": "Liquidación completa - 0.1% recaudos equipo"}], "liquidaciones": [], "periodo_actual": "2026-04"};
+  try { const r = localStorage.getItem(DB_KEY); if (r) return normalizeDB(JSON.parse(r)); } catch(e){}
+  const d = normalizeDB();
   localStorage.setItem(DB_KEY, JSON.stringify(d));
   return d;
 }
-function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(normalizeDB(db))); }
 let DB = loadDB();
 
 // ═══════════════════════════════════════════════════════
@@ -520,6 +532,30 @@ function toast(msg,type='ok') {
   const ico = type==='ok'?'✓':type==='err'?'✕':'!';
   t.innerHTML=`<span>${ico}</span> ${msg}`;
   clearTimeout(_tt); _tt=setTimeout(()=>t.className='',3200);
+}
+
+function requireSharePointSession() {
+  if (!_user || !_token) {
+    toast('Inicia sesión con Microsoft antes de guardar cambios', 'err');
+    loginMicrosoft();
+    return false;
+  }
+  return true;
+}
+
+async function runCloudAction(label, fn) {
+  if (!requireSharePointSession()) return false;
+  setSyncStatus('syncing', label || 'Guardando...');
+  try {
+    await fn();
+    saveDB(DB);
+    setSyncStatus('ok', 'SharePoint ✓');
+    return true;
+  } catch (e) {
+    setSyncStatus('err', 'Error: '+(e.message||'SharePoint').slice(0,30));
+    toast('No se guardó en SharePoint: '+(e.message||e), 'err');
+    return false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -702,26 +738,37 @@ function modalNuevaOrden(datos={}) {
 </div>`);
 }
 
-function guardarOrden(edit) {
+async function guardarOrden(edit) {
   const ns=document.getElementById('f-ns').value.trim().toUpperCase();
   const p=document.getElementById('f-proyecto').value.trim();
   const v=parseFloat(document.getElementById('f-valor').value)||0;
   const a=document.getElementById('f-asesor').value;
   if(!ns||!p||!v){toast('Completa los campos obligatorios','err');return;}
+  const old=DB.ordenes.find(o=>o.numero_s===ns);
   const obj={numero_s:ns,nombre_proyecto:p,cliente:document.getElementById('f-cliente').value.trim(),
     codigo_asesor:a,valor_venta:v,pct_dcto:parseFloat(document.getElementById('f-dcto').value),
     facturas:document.getElementById('f-facturas').value.trim(),fecha:document.getElementById('f-fecha').value,
-    tipo_asesor:DB.asesores.find(a2=>a2.codigo===a)?.tipo||'directo'};
-  if(edit){const i=DB.ordenes.findIndex(o=>o.numero_s===ns);if(i>=0)DB.ordenes[i]=obj;}
-  else{if(DB.ordenes.find(o=>o.numero_s===ns)){toast('Esta S ya existe','err');return;}DB.ordenes.push(obj);}
-  saveDB(DB);closeModal();render();toast(edit?'Orden actualizada':`Orden ${ns} creada`);
+    tipo_asesor:DB.asesores.find(a2=>a2.codigo===a)?.tipo||'directo',_spId:old?._spId};
+  if(!edit&&old){toast('Esta S ya existe','err');return;}
+  const ok=await runCloudAction(edit?'Actualizando orden...':'Creando orden...', async function(){
+    await spSaveOrden(obj,!edit||!obj._spId);
+    if(edit){const i=DB.ordenes.findIndex(o=>o.numero_s===ns);if(i>=0)DB.ordenes[i]=obj;}
+    else DB.ordenes.push(obj);
+  });
+  if(ok){closeModal();render();toast(edit?'Orden actualizada':`Orden ${ns} creada`);}
 }
 function modalEditarOrden(ns){const o=DB.ordenes.find(o2=>o2.numero_s===ns);if(o)modalNuevaOrden(o);}
-function eliminarOrden(ns){
+async function eliminarOrden(ns){
   if(!confirm(`¿Eliminar la orden ${ns} y todos sus recaudos?`))return;
-  DB.ordenes=DB.ordenes.filter(o=>o.numero_s!==ns);
-  DB.ingresos=DB.ingresos.filter(i=>i.numero_s!==ns);
-  saveDB(DB);render();toast(`Orden ${ns} eliminada`,'warn');
+  const orden=DB.ordenes.find(o=>o.numero_s===ns);
+  const ingresos=DB.ingresos.filter(i=>i.numero_s===ns);
+  const ok=await runCloudAction('Eliminando orden...', async function(){
+    await spDelOrden(orden||{});
+    for(const ingreso of ingresos) await spDelIngreso(ingreso);
+    DB.ordenes=DB.ordenes.filter(o=>o.numero_s!==ns);
+    DB.ingresos=DB.ingresos.filter(i=>i.numero_s!==ns);
+  });
+  if(ok){render();toast(`Orden ${ns} eliminada`,'warn');}
 }
 function verDetalleOrden(ns){
   const o=DB.ordenes.find(o2=>o2.numero_s===ns);if(!o)return;
@@ -830,35 +877,47 @@ function modalNuevoIngreso(ns_ini='') {
   <button class="btn btn-primary" onclick="guardarIngreso()">Registrar</button>
 </div>`);
 }
-function guardarIngreso() {
+async function guardarIngreso() {
   const ns=document.getElementById('f-ins').value;
   const v=parseFloat(document.getElementById('f-ivalor').value)||0;
   const f=document.getElementById('f-ifecha').value;
   if(!ns||!v){toast('Selecciona una S e ingresa el valor','err');return;}
-  DB.ingresos.push({id:uid(),numero_s:ns,fecha:f,valor:v,
+  const obj={id:uid(),numero_s:ns,fecha:f,valor:v,
     referencia:document.getElementById('f-iref').value.trim(),
-    notas:document.getElementById('f-inotas').value.trim()});
-  saveDB(DB);closeModal();render();toast(`Recaudo ${fmt.format(v)} registrado para ${ns}`);
+    notas:document.getElementById('f-inotas').value.trim()};
+  const ok=await runCloudAction('Guardando recaudo...', async function(){
+    await spSaveIngreso(obj);
+    DB.ingresos.push(obj);
+  });
+  if(ok){closeModal();render();toast(`Recaudo ${fmt.format(v)} registrado para ${ns}`);}
 }
-function eliminarIngreso(id){
+async function eliminarIngreso(id){
   if(!confirm('¿Eliminar este recaudo?'))return;
-  DB.ingresos=DB.ingresos.filter(i=>i.id!==id);saveDB(DB);render();toast('Recaudo eliminado','warn');
+  const ingreso=DB.ingresos.find(i=>i.id===id);
+  const ok=await runCloudAction('Eliminando recaudo...', async function(){
+    await spDelIngreso(ingreso||{});
+    DB.ingresos=DB.ingresos.filter(i=>i.id!==id);
+  });
+  if(ok){render();toast('Recaudo eliminado','warn');}
 }
 function handleDropIngresos(e){handleFileIngresos(e.dataTransfer.files[0]);}
 function handleFileIngresos(file){if(!file)return;const r=new FileReader();r.onload=e=>parseCSVIngresos(e.target.result);r.readAsText(file,'UTF-8');}
-function parseCSVIngresos(text){
+async function parseCSVIngresos(text){
   const lines=text.trim().split('\n');if(lines.length<2){toast('Archivo vacío','err');return;}
   const hdrs=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/\s+/g,'_').replace(/['"]/g,''));
-  let added=0,errors=0;
+  let added=0,errors=0; const rows=[];
   for(let i=1;i<lines.length;i++){
     const cols=splitCSV(lines[i]);const row={};hdrs.forEach((h,j)=>row[h]=(cols[j]||'').replace(/['"]/g,'').trim());
     const ns=(row['numero_s']||row['s']||row['orden']||'').toUpperCase();
     const v=parseFloat((row['valor']||row['value']||'0').replace(/[,$ ]/g,''));
     if(!ns||!v||!DB.ordenes.find(o=>o.numero_s===ns)){errors++;continue;}
-    DB.ingresos.push({id:uid(),numero_s:ns,fecha:parseFecha(row['fecha']||row['date']||''),valor:v,
-      referencia:row['referencia']||row['ref']||row['name']||'',notas:''});added++;
+    rows.push({id:uid(),numero_s:ns,fecha:parseFecha(row['fecha']||row['date']||''),valor:v,
+      referencia:row['referencia']||row['ref']||row['name']||'',notas:''});
   }
-  saveDB(DB);render();toast(`${added} recaudos importados${errors>0?' ('+errors+' errores)':''}`,'ok');
+  const ok=await runCloudAction('Importando recaudos...', async function(){
+    for(const obj of rows){await spSaveIngreso(obj);DB.ingresos.push(obj);added++;}
+  });
+  if(ok){render();toast(`${added} recaudos importados${errors>0?' ('+errors+' errores)':''}`,'ok');}
 }
 function splitCSV(line){const r=[];let c='';let q=false;for(const ch of line){if(ch==='"')q=!q;else if((ch===','||ch===';')&&!q){r.push(c);c='';}else c+=ch;}r.push(c);return r;}
 function parseFecha(s){if(!s)return new Date().toISOString().slice(0,10);if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){const[d,m,y]=s.split('/');return`${y}-${m}-${d}`;}return s.slice(0,10);}
@@ -934,16 +993,25 @@ function modalPagoComision(codigoPresel='') {
   <button class="btn btn-primary" onclick="guardarPago()">Registrar Pago</button>
 </div>`);
 }
-function guardarPago(){
+async function guardarPago(){
   const a=document.getElementById('f-pasesor').value;const v=parseFloat(document.getElementById('f-pvalor').value)||0;
   if(!a||!v){toast('Completa los campos','err');return;}
-  DB.pagos_comision.push({id:uid(),codigo_asesor:a,valor:v,fecha:document.getElementById('f-pfecha').value,
-    periodo:document.getElementById('f-pperiodo').value,notas:document.getElementById('f-pnotas').value.trim()});
-  saveDB(DB);closeModal();render();toast(`Pago de ${fmt.format(v)} registrado`);
+  const obj={id:uid(),codigo_asesor:a,valor:v,fecha:document.getElementById('f-pfecha').value,
+    periodo:document.getElementById('f-pperiodo').value,notas:document.getElementById('f-pnotas').value.trim()};
+  const ok=await runCloudAction('Guardando pago...', async function(){
+    await spSavePago(obj);
+    DB.pagos_comision.push(obj);
+  });
+  if(ok){closeModal();render();toast(`Pago de ${fmt.format(v)} registrado`);}
 }
-function eliminarPago(id){
+async function eliminarPago(id){
   if(!confirm('¿Eliminar este pago?'))return;
-  DB.pagos_comision=DB.pagos_comision.filter(p=>p.id!==id);saveDB(DB);render();toast('Pago eliminado','warn');
+  const pago=DB.pagos_comision.find(p=>p.id===id);
+  const ok=await runCloudAction('Eliminando pago...', async function(){
+    await spDelPago(pago||{});
+    DB.pagos_comision=DB.pagos_comision.filter(p=>p.id!==id);
+  });
+  if(ok){render();toast('Pago eliminado','warn');}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -956,7 +1024,7 @@ function liquidacion() {
   <div><h2>LIQUIDACIÓN <span>MENSUAL</span></h2><p>Período: <strong>${DB.periodo_actual}</strong></p></div>
   <div class="flex-row">
     <input type="month" value="${DB.periodo_actual}"
-      onchange="DB.periodo_actual=this.value;saveDB(DB);render()"
+      onchange="guardarPeriodoActual(this.value)"
       style="background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:5px;font-size:0.85rem">
     <button class="btn btn-ghost" onclick="exportarLiquidacion()">⬇️ Exportar CSV</button>
     <button class="btn btn-primary" onclick="cerrarLiquidacion()">✓ MARCAR TODO COMO PAGADO</button>
@@ -1037,35 +1105,16 @@ ${DB.asesores.filter(a=>a.activo).map(a=>{
 </div>`;
 }
 
-function cerrarLiquidacion() {
-  const asesoresActivos=DB.asesores.filter(a=>a.activo);
-  const pendientes=asesoresActivos.filter(a=>calcAsesorStats(a).comision_pendiente>0);
-  if(pendientes.length===0){toast('No hay comisiones pendientes','warn');return;}
-  if(!confirm(`¿Marcar como PAGADO el total pendiente de ${pendientes.length} asesor(es) para el período ${DB.periodo_actual}?\n\nEsto registrará un pago automático por el saldo pendiente de cada asesor.`))return;
-  const fecha=new Date().toISOString().slice(0,10);
-  for(const a of pendientes){
-    const s=calcAsesorStats(a);
-    if(s.comision_pendiente>0){
-      // For direct asesores: register per-orden payments
-      if(a.tipo==='directo'){
-        const ordenes=DB.ordenes.filter(o=>o.codigo_asesor===a.codigo);
-        for(const o of ordenes){
-          const os=calcOrdenStats(o);
-          if(os.comision_pendiente>0){
-            DB.pagos_comision.push({id:uid(),codigo_asesor:a.codigo,numero_s:o.numero_s,
-              valor:os.comision_pendiente,fecha,periodo:DB.periodo_actual,
-              notas:`Liquidación mensual automática ${DB.periodo_actual}`});
-          }
-        }
-      } else {
-        // Soporte: single global payment
-        DB.pagos_comision.push({id:uid(),codigo_asesor:a.codigo,
-          valor:s.comision_pendiente,fecha,periodo:DB.periodo_actual,
-          notas:`Liquidación mensual automática ${DB.periodo_actual}`});
-      }
-    }
-  }
-  saveDB(DB);render();toast(`Liquidación ${DB.periodo_actual} cerrada. ${pendientes.length} asesores marcados como pagados.`);
+async function cerrarLiquidacion() { return cerrarLiq(); }
+
+async function guardarPeriodoActual(periodo) {
+  const anterior=DB.periodo_actual;
+  const ok=await runCloudAction('Guardando período...', async function(){
+    DB.periodo_actual=periodo;
+    await spSaveCfg('periodo_actual',periodo);
+  });
+  if(!ok)DB.periodo_actual=anterior;
+  render();
 }
 
 function exportarLiquidacion(){
@@ -1158,16 +1207,16 @@ function importar(){
     <input type="file" id="fb" accept=".json" style="display:none" onchange="importarBackup(this.files[0])">
     <button class="btn btn-danger" onclick="resetearDatos()">🗑 Borrar Todo</button>
   </div>
-  <div class="text-muted" style="font-size:0.78rem;margin-top:10px">Los datos se guardan en <strong>localStorage</strong>. Exporta el backup regularmente.</div>
+  <div class="text-muted" style="font-size:0.78rem;margin-top:10px">Los datos se guardan en <strong>SharePoint</strong>. El navegador conserva una copia temporal para acelerar la carga.</div>
 </div>`;
 }
 
 function handleDropOrdenes(e){handleFileOrdenes(e.dataTransfer.files[0]);}
 function handleFileOrdenes(file){if(!file)return;const r=new FileReader();r.onload=e=>parseCSVOrdenes(e.target.result);r.readAsText(file,'UTF-8');}
-function parseCSVOrdenes(text){
+async function parseCSVOrdenes(text){
   const lines=text.trim().split('\n');if(lines.length<2){toast('Archivo vacío','err');return;}
   const hdrs=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/\s+/g,'_').replace(/['"]/g,''));
-  let added=0,updated=0,errors=0;
+  let added=0,updated=0,errors=0; const rows=[];
   for(let i=1;i<lines.length;i++){
     const cols=splitCSV(lines[i]);const row={};hdrs.forEach((h,j)=>row[h]=(cols[j]||'').replace(/['"]/g,'').trim());
     const ns=(row['numero_s']||row['s']||row['nombre']||'').toUpperCase();
@@ -1181,30 +1230,44 @@ function parseCSVOrdenes(text){
       codigo_asesor:a||'A1',valor_venta:v,pct_dcto,facturas:row['facturas']||'',
       fecha:parseFecha(row['fecha']||row['date']||''),
       tipo_asesor:DB.asesores.find(a2=>a2.codigo===a)?.tipo||'directo'};
-    const idx=DB.ordenes.findIndex(o=>o.numero_s===ns);
-    if(idx>=0){DB.ordenes[idx]={...DB.ordenes[idx],...obj};updated++;}else{DB.ordenes.push(obj);added++;}
+    rows.push(obj);
   }
-  saveDB(DB);render();toast(`${added} nuevas, ${updated} actualizadas${errors>0?' ('+errors+' errores)':''}`,'ok');
+  const ok=await runCloudAction('Importando órdenes...', async function(){
+    for(const obj of rows){
+      const idx=DB.ordenes.findIndex(o=>o.numero_s===obj.numero_s);
+      if(idx>=0){
+        const merged={...DB.ordenes[idx],...obj};
+        await spSaveOrden(merged,!merged._spId);
+        DB.ordenes[idx]=merged; updated++;
+      }else{
+        await spSaveOrden(obj,true);
+        DB.ordenes.push(obj); added++;
+      }
+    }
+  });
+  if(ok){render();toast(`${added} nuevas, ${updated} actualizadas${errors>0?' ('+errors+' errores)':''}`,'ok');}
 }
 
 function handleDropPagos(e){handleFilePagos(e.dataTransfer.files[0]);}
 function handleFilePagos(file){if(!file)return;const r=new FileReader();r.onload=e=>parseCSVPagos(e.target.result);r.readAsText(file,'UTF-8');}
-function parseCSVPagos(text){
+async function parseCSVPagos(text){
   const lines=text.trim().split('\n');if(lines.length<2){toast('Archivo vacío','err');return;}
   const hdrs=lines[0].split(/[,;]/).map(h=>h.trim().toLowerCase().replace(/\s+/g,'_').replace(/['"]/g,''));
-  let added=0,errors=0;
+  let added=0,errors=0; const rows=[];
   for(let i=1;i<lines.length;i++){
     const cols=splitCSV(lines[i]);const row={};hdrs.forEach((h,j)=>row[h]=(cols[j]||'').replace(/['"]/g,'').trim());
     const ns=(row['numero_s']||row['s']||'').toUpperCase();
     const a=(row['codigo_asesor']||row['asesor']||'').toUpperCase();
     const v=parseFloat((row['valor_pagado']||row['valor']||'0').replace(/[,$ ]/g,''));
     if(!v||(!ns&&!a)){errors++;continue;}
-    DB.pagos_comision.push({id:uid(),codigo_asesor:a,numero_s:ns||undefined,valor:v,
+    rows.push({id:uid(),codigo_asesor:a,numero_s:ns||undefined,valor:v,
       fecha:parseFecha(row['fecha']||row['date']||''),
       periodo:row['periodo']||DB.periodo_actual,notas:row['notas']||row['notes']||'Importado desde CSV'});
-    added++;
   }
-  saveDB(DB);render();toast(`${added} pagos importados${errors>0?' ('+errors+' errores)':''}`,'ok');
+  const ok=await runCloudAction('Importando pagos...', async function(){
+    for(const obj of rows){await spSavePago(obj);DB.pagos_comision.push(obj);added++;}
+  });
+  if(ok){render();toast(`${added} pagos importados${errors>0?' ('+errors+' errores)':''}`,'ok');}
 }
 
 function descargarPlantillaOrdenes(){
@@ -1220,8 +1283,8 @@ function descargarPlantillaPagos(){
   const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plantilla_comisiones_pagadas.csv';a.click();
 }
 function exportarBackup(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`sutrak_backup_${new Date().toISOString().slice(0,10)}.json`;a.click();toast('Backup exportado');}
-function importarBackup(file){if(!file)return;const r=new FileReader();r.onload=e=>{try{DB=JSON.parse(e.target.result);saveDB(DB);render();toast('Backup restaurado');}catch{toast('Error al leer el backup','err');}};r.readAsText(file);}
-function resetearDatos(){if(!confirm('⚠️ ¿Eliminar TODOS los datos?'))return;if(!confirm('¿Seguro? No se puede deshacer.'))return;localStorage.removeItem(DB_KEY);DB=loadDB();render();toast('Datos eliminados','warn');}
+function importarBackup(file){if(!file)return;const r=new FileReader();r.onload=async e=>{try{const next=normalizeDB(JSON.parse(e.target.result));const old=DB;const ok=await runCloudAction('Restaurando backup...',async function(){for(const o of [...old.ordenes])await spDelOrden(o);for(const i of [...old.ingresos])await spDelIngreso(i);for(const p of [...old.pagos_comision])await spDelPago(p);DB=next;await pushAllToSharePoint();});if(ok){render();toast('Backup restaurado en SharePoint');}}catch{toast('Error al leer el backup','err');}};r.readAsText(file);}
+async function resetearDatos(){if(!confirm('⚠️ ¿Eliminar TODOS los datos de SharePoint?'))return;if(!confirm('¿Seguro? No se puede deshacer.'))return;const ok=await runCloudAction('Borrando datos...',async function(){for(const o of [...DB.ordenes])await spDelOrden(o);for(const i of [...DB.ingresos])await spDelIngreso(i);for(const p of [...DB.pagos_comision])await spDelPago(p);DB=normalizeDB({asesores:DB.asesores,periodo_actual:DB.periodo_actual});await spSaveCfg('asesores',JSON.stringify(DB.asesores));await spSaveCfg('periodo_actual',DB.periodo_actual);});if(ok){render();toast('Datos eliminados','warn');}}
 
 // ═══════════════════════════════════════════════════════
 // CONFIG
@@ -1265,8 +1328,8 @@ function modalNuevoAsesor(){
 </div>
 <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarAsesor()">Crear</button></div>`);
 }
-function guardarAsesor(){const c=document.getElementById('fa-cod').value.trim().toUpperCase();const n=document.getElementById('fa-nom').value.trim();const t=document.getElementById('fa-tipo').value;if(!c||!n){toast('Completa los campos','err');return;}if(DB.asesores.find(a=>a.codigo===c)){toast('Código ya existe','err');return;}DB.asesores.push({codigo:c,nombre:n,tipo:t,activo:true});saveDB(DB);closeModal();render();toast(`Asesor ${n} creado`);}
-function eliminarAsesor(c){if(!confirm(`¿Eliminar el asesor ${c}?`))return;DB.asesores=DB.asesores.filter(a=>a.codigo!==c);saveDB(DB);render();toast('Asesor eliminado','warn');}
+async function guardarAsesor(){const c=document.getElementById('fa-cod').value.trim().toUpperCase();const n=document.getElementById('fa-nom').value.trim();const t=document.getElementById('fa-tipo').value;if(!c||!n){toast('Completa los campos','err');return;}if(DB.asesores.find(a=>a.codigo===c)){toast('Código ya existe','err');return;}const next=[...DB.asesores,{codigo:c,nombre:n,tipo:t,activo:true}];const ok=await runCloudAction('Guardando asesor...',async function(){DB.asesores=next;await spSaveCfg('asesores',JSON.stringify(DB.asesores));});if(ok){closeModal();render();toast(`Asesor ${n} creado`);}}
+async function eliminarAsesor(c){if(!confirm(`¿Eliminar el asesor ${c}?`))return;const next=DB.asesores.filter(a=>a.codigo!==c);const ok=await runCloudAction('Eliminando asesor...',async function(){DB.asesores=next;await spSaveCfg('asesores',JSON.stringify(DB.asesores));});if(ok){render();toast('Asesor eliminado','warn');}}
 
 // ═══════════════════════════════════════════════════════
 // MODAL
@@ -1425,13 +1488,14 @@ function liquidacion() {
     +'<td></td></tr></tfoot></table></div>';
 }
 
-function cerrarLiq() {
+async function cerrarLiq() {
   var sel=window._liqPer;
   var pends=DB.asesores.filter(function(a){return a.activo&&calcAsesorStatsPer(a,sel).comision_pendiente>0;});
   if(!pends.length){toast('Sin pendientes en este período','warn');return;}
   if(!confirm('Marcar PAGADO el saldo de '+pends.length+' asesor(es) para '+getPeriodoLabel(sel)+'?')) return;
   var fecha=new Date().toISOString().slice(0,10);
   var ingP=DB.ingresos.filter(function(i){return getPeriodoLiquidacion(i.fecha)===sel;});
+  var nuevos=[];
   for(var ai=0;ai<pends.length;ai++){
     var a=pends[ai];
     if(a.tipo==='directo'){
@@ -1442,26 +1506,27 @@ function cerrarLiq() {
         if(rP===0) continue;
         var cG=rP*getPctComision(o.pct_dcto);
         var cP=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&(p.periodo||'').slice(0,7)===sel;}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
-        if(cG-cP>1) DB.pagos_comision.push({id:uid(),codigo_asesor:a.codigo,numero_s:o.numero_s,valor:Math.round(cG-cP),fecha:fecha,periodo:sel,notas:'Liq. autom. '+getPeriodoLabel(sel)});
+        if(cG-cP>1) nuevos.push({id:uid(),codigo_asesor:a.codigo,numero_s:o.numero_s,valor:Math.round(cG-cP),fecha:fecha,periodo:sel,notas:'Liq. autom. '+getPeriodoLabel(sel)});
       }
     } else {
       var s=calcAsesorStatsPer(a,sel);
-      if(s.comision_pendiente>1) DB.pagos_comision.push({id:uid(),codigo_asesor:a.codigo,numero_s:'',valor:Math.round(s.comision_pendiente),fecha:fecha,periodo:sel,notas:'Liq. autom. '+getPeriodoLabel(sel)});
+      if(s.comision_pendiente>1) nuevos.push({id:uid(),codigo_asesor:a.codigo,numero_s:'',valor:Math.round(s.comision_pendiente),fecha:fecha,periodo:sel,notas:'Liq. autom. '+getPeriodoLabel(sel)});
     }
   }
-  saveDB(DB); render();
-  toast('Período '+getPeriodoLabel(sel)+' cerrado');
+  var ok=await runCloudAction('Cerrando liquidación...', async function(){
+    for(var ni=0;ni<nuevos.length;ni++){await spSavePago(nuevos[ni]);DB.pagos_comision.push(nuevos[ni]);}
+  });
+  if(ok){render();toast('Período '+getPeriodoLabel(sel)+' cerrado');}
 }
 
 // ════ MICROSOFT AUTH — OAuth2 PKCE (sin librería externa) ════
 const _AZ = {
   clientId:   "ee1c4a06-0dc2-4187-b173-3729cd689a34",
   tenantId:   "437254d0-64b3-4dc3-9684-275c2995547a",
-  tenantName: "sutraksa",
-  tenantId:   "437254d0-64b3-4dc3-9684-275c2995547a",
-  siteName:   "sutrakserver",
+  siteHost:   "sutraksa.sharepoint.com",
+  sitePath:   "/sites/sutrakserver",
   redirect:   "https://sutraksas.github.io/comisiones/index.html",
-  scopes:     "openid profile email Sites.ReadWrite.All Files.ReadWrite.All offline_access",
+  scopes:     "openid profile email offline_access Sites.ReadWrite.All Sites.Manage.All",
   authority:  "https://login.microsoftonline.com/437254d0-64b3-4dc3-9684-275c2995547a",
 };
 
@@ -1589,16 +1654,9 @@ async function _graph(method,path,body){
 async function _getSiteId(){
   if(_siteId)return _siteId;
   localStorage.removeItem('sutrak_siteid'); // Force fresh lookup
-  // Try with domain first, fallback to tenant ID
-  var url='/sites/'+_AZ.tenantName+'.sharepoint.com:/sites/'+_AZ.siteName;
+  var url='/sites/'+_AZ.siteHost+':'+_AZ.sitePath;
   console.log('Getting site ID from:', url);
   var d=await _graph('GET',url);
-  if(!d){
-    // Fallback: try with tenant ID
-    var url2='/sites/'+_AZ.tenantId+'.sharepoint.com:/sites/'+_AZ.siteName;
-    console.log('Fallback URL:', url2);
-    d=await _graph('GET',url2);
-  }
   if(!d){console.error('Failed to get site ID');return null;}
   console.log('Site ID obtained:', d.id);
   _siteId=d.id; localStorage.setItem('sutrak_siteid',_siteId); return _siteId;
@@ -1707,6 +1765,16 @@ async function spSaveCfg(clave,valor){
   var ex=rows.find(function(r){return r.clave===clave;});
   if(ex)await _graph('PATCH','/sites/'+sid+'/lists/'+lid+'/items/'+ex._spId+'/fields',{clave:clave,valor:valor});
   else await _graph('POST','/sites/'+sid+'/lists/'+lid+'/items',{fields:{clave:clave,valor:valor}});
+}
+
+async function pushAllToSharePoint(){
+  for(const o of DB.ordenes){delete o._spId; await spSaveOrden(o,true);}
+  for(const i of DB.ingresos) delete i._spId;
+  for(const p of DB.pagos_comision) delete p._spId;
+  for(const i of DB.ingresos) await spSaveIngreso(i);
+  for(const p of DB.pagos_comision) await spSavePago(p);
+  await spSaveCfg('periodo_actual',DB.periodo_actual);
+  await spSaveCfg('asesores',JSON.stringify(DB.asesores));
 }
 
 function _showApp(){
