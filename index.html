@@ -1708,6 +1708,19 @@ async function syncFromSharePoint(){
     var ing=await _listItems(sid,_listIds.SutrakIngresos);
     var pag=await _listItems(sid,_listIds.SutrakPagosComision);
     var cfg=await _listItems(sid,_listIds.SutrakConfig);
+    var spEmpty=ord.length===0&&ing.length===0&&pag.length===0;
+    var localHasData=DB.ordenes.length>0||DB.ingresos.length>0||DB.pagos_comision.length>0;
+    if(spEmpty&&localHasData){
+      if(confirm('SharePoint está vacío y este navegador tiene datos locales. ¿Quieres cargar estos datos a SharePoint ahora?')){
+        await pushAllToSharePoint();
+        setSyncStatus('ok','SharePoint ✓');
+        toast('SharePoint inicializado con los datos locales');
+        return;
+      }
+      setSyncStatus('warn','SharePoint vacío');
+      toast('Sincronización cancelada para no pisar los datos locales','warn');
+      return;
+    }
     DB.ordenes=ord.map(_sO);
     DB.ingresos=ing.map(_sI);
     DB.pagos_comision=pag.map(_sP);
