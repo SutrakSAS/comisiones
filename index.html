@@ -547,9 +547,29 @@ async function runCloudAction(label, fn) {
   if (!requireSharePointSession()) return false;
   setSyncStatus('syncing', label || 'Guardando...');
   try {
+    var before=normalizeDB(DB);
     await fn();
+    var after=normalizeDB(DB);
+    var cloud=await loadDBFromSharePointFile();
+    DB=mergeDBForSave(before,after,cloud);
     saveDB(DB);
-    await saveDBToSharePointFile();
+    await saveDBToSharePointFile(DB);
+    setSyncStatus('ok', 'SharePoint ✓');
+    return true;
+  } catch (e) {
+    setSyncStatus('err', 'Error: '+(e.message||'SharePoint').slice(0,30));
+    toast('No se guardó en SharePoint: '+(e.message||e), 'err');
+    return false;
+  }
+}
+
+async function replaceCloudDB(label,nextDB) {
+  if (!requireSharePointSession()) return false;
+  setSyncStatus('syncing', label || 'Guardando...');
+  try {
+    DB=normalizeDB(nextDB);
+    saveDB(DB);
+    await saveDBToSharePointFile(DB);
     setSyncStatus('ok', 'SharePoint ✓');
     return true;
   } catch (e) {
@@ -1284,7 +1304,7 @@ function descargarPlantillaPagos(){
   const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plantilla_comisiones_pagadas.csv';a.click();
 }
 function exportarBackup(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`sutrak_backup_${new Date().toISOString().slice(0,10)}.json`;a.click();toast('Backup exportado');}
-function importarBackup(file){if(!file)return;const r=new FileReader();r.onload=async e=>{try{const next=normalizeDB(JSON.parse(e.target.result));const old=DB;const ok=await runCloudAction('Restaurando backup...',async function(){for(const o of [...old.ordenes])await spDelOrden(o);for(const i of [...old.ingresos])await spDelIngreso(i);for(const p of [...old.pagos_comision])await spDelPago(p);DB=next;await pushAllToSharePoint();});if(ok){render();toast('Backup restaurado en SharePoint');}}catch{toast('Error al leer el backup','err');}};r.readAsText(file);}
+function importarBackup(file){if(!file)return;const r=new FileReader();r.onload=async e=>{let next;try{next=normalizeDB(JSON.parse(e.target.result));}catch{toast('Error al leer el backup','err');return;}const ok=await replaceCloudDB('Restaurando backup...',next);if(ok){render();toast('Backup restaurado en SharePoint');}};r.readAsText(file);}
 async function resetearDatos(){if(!confirm('⚠️ ¿Eliminar TODOS los datos de SharePoint?'))return;if(!confirm('¿Seguro? No se puede deshacer.'))return;const ok=await runCloudAction('Borrando datos...',async function(){for(const o of [...DB.ordenes])await spDelOrden(o);for(const i of [...DB.ingresos])await spDelIngreso(i);for(const p of [...DB.pagos_comision])await spDelPago(p);DB=normalizeDB({asesores:DB.asesores,periodo_actual:DB.periodo_actual});await spSaveCfg('asesores',JSON.stringify(DB.asesores));await spSaveCfg('periodo_actual',DB.periodo_actual);});if(ok){render();toast('Datos eliminados','warn');}}
 
 // ═══════════════════════════════════════════════════════
@@ -1691,9 +1711,51 @@ async function loadDBFromSharePointFile(){
   return normalizeDB(JSON.parse(txt));
 }
 
-async function saveDBToSharePointFile(){
+async function saveDBToSharePointFile(db){
   var sid=await _getSiteId();
-  await _graphContent('PUT','/sites/'+sid+'/drive/root:/'+_DB_FILE+':/content',JSON.stringify(normalizeDB(DB),null,2));
+  await _graphContent('PUT','/sites/'+sid+'/drive/root:/'+_DB_FILE+':/content',JSON.stringify(normalizeDB(db||DB),null,2));
+}
+
+function stableJSON(v){
+  return JSON.stringify(v,Object.keys(v||{}).sort());
+}
+
+function keyIngreso(i){
+  return i.id||[i.numero_s,i.fecha,i.valor,i.referencia||''].join('|');
+}
+
+function keyPago(p){
+  return p.id||[p.codigo_asesor||'',p.numero_s||'',p.fecha||'',p.periodo||'',p.valor].join('|');
+}
+
+function mergeByKey(before,after,cloud,keyFn){
+  var beforeMap=new Map((before||[]).map(function(x){return [keyFn(x),x];}));
+  var afterMap=new Map((after||[]).map(function(x){return [keyFn(x),x];}));
+  var deleted=new Set();
+  beforeMap.forEach(function(_,k){if(!afterMap.has(k))deleted.add(k);});
+  var out=(cloud||[]).filter(function(x){return !deleted.has(keyFn(x));});
+  var outMap=new Map(out.map(function(x,i){return [keyFn(x),i];}));
+  afterMap.forEach(function(item,k){
+    var old=beforeMap.get(k);
+    if(old&&stableJSON(old)===stableJSON(item))return;
+    if(outMap.has(k))out[outMap.get(k)]=item;
+    else{outMap.set(k,out.length);out.push(item);}
+  });
+  return out;
+}
+
+function mergeDBForSave(before,after,cloud){
+  before=normalizeDB(before);
+  after=normalizeDB(after);
+  cloud=cloud?normalizeDB(cloud):normalizeDB();
+  return normalizeDB({
+    asesores: mergeByKey(before.asesores,after.asesores,cloud.asesores,function(a){return a.codigo;}),
+    ordenes: mergeByKey(before.ordenes,after.ordenes,cloud.ordenes,function(o){return o.numero_s;}),
+    ingresos: mergeByKey(before.ingresos,after.ingresos,cloud.ingresos,keyIngreso),
+    pagos_comision: mergeByKey(before.pagos_comision,after.pagos_comision,cloud.pagos_comision,keyPago),
+    liquidaciones: mergeByKey(before.liquidaciones||[],after.liquidaciones||[],cloud.liquidaciones||[],function(l){return l.id||l.periodo||stableJSON(l);}),
+    periodo_actual: after.periodo_actual||cloud.periodo_actual,
+  });
 }
 
 var _LC={SutrakOrdenes:[{name:'numero_s',text:{}},{name:'nombre_proyecto',text:{}},{name:'cliente',text:{}},{name:'codigo_asesor',text:{}},{name:'valor_venta',number:{}},{name:'pct_dcto',number:{}},{name:'facturas',text:{}},{name:'fecha',text:{}},{name:'tipo_asesor',text:{}}],SutrakIngresos:[{name:'numero_s',text:{}},{name:'fecha',text:{}},{name:'valor',number:{}},{name:'referencia',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakPagosComision:[{name:'codigo_asesor',text:{}},{name:'numero_s',text:{}},{name:'valor',number:{}},{name:'fecha',text:{}},{name:'periodo',text:{}},{name:'notas',text:{}},{name:'uid',text:{}}],SutrakConfig:[{name:'clave',text:{}},{name:'valor',text:{allowMultipleLines:true}}]};
