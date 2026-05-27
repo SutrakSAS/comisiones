@@ -451,6 +451,10 @@ function loadDB() {
 function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(normalizeDB(db))); }
 let DB = loadDB();
 
+function cloneDB(db) {
+  return JSON.parse(JSON.stringify(normalizeDB(db)));
+}
+
 // ═══════════════════════════════════════════════════════
 // BUSINESS LOGIC
 // ═══════════════════════════════════════════════════════
@@ -547,9 +551,9 @@ async function runCloudAction(label, fn) {
   if (!requireSharePointSession()) return false;
   setSyncStatus('syncing', label || 'Guardando...');
   try {
-    var before=normalizeDB(DB);
+    var before=cloneDB(DB);
     await fn();
-    var after=normalizeDB(DB);
+    var after=cloneDB(DB);
     var cloud=await loadDBFromSharePointFile();
     DB=mergeDBForSave(before,after,cloud);
     saveDB(DB);
