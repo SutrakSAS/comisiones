@@ -869,13 +869,14 @@ function ingresos() {
 </div>
 ${filtrados.length===0?`<div class="empty-state"><div class="icon">💳</div><p>No hay recaudos registrados aún.</p></div>`:`
 <div class="card" style="padding:0"><div class="table-wrap"><table>
-  <thead><tr><th>Fecha</th><th>S / Orden</th><th>Proyecto</th><th>Asesor</th>
+  <thead><tr><th>Fecha</th><th>Período</th><th>S / Orden</th><th>Proyecto</th><th>Asesor</th>
   <th style="text-align:right">Valor Recaudado</th><th style="text-align:right">Comisión Causada</th><th>Referencia</th><th></th></tr></thead>
   <tbody>
   ${filtrados.map(i=>{const o=DB.ordenes.find(o2=>o2.numero_s===i.numero_s);const a=o?DB.asesores.find(a2=>a2.codigo===o.codigo_asesor):null;
     const pct=o?getPctComision(o.pct_dcto):0;const com=(parseFloat(i.valor)||0)*pct;
     return`<tr>
       <td style="font-size:0.76rem">${fmtD(i.fecha)}</td>
+      <td><span class="chip">${getPeriodoLiquidacion(i.fecha)||'—'}</span></td>
       <td><span class="chip">${i.numero_s}</span></td>
       <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem">${o?.nombre_proyecto||'—'}</td>
       <td style="font-size:0.78rem">${a?.nombre||'—'}</td>
@@ -910,10 +911,11 @@ function modalNuevoIngreso(ns_ini='') {
 </div>`);
 }
 async function guardarIngreso() {
-  const ns=document.getElementById('f-ins').value;
+  const ns=document.getElementById('f-ins').value.trim().toUpperCase();
   const v=parseFloat(document.getElementById('f-ivalor').value)||0;
-  const f=document.getElementById('f-ifecha').value;
+  const f=document.getElementById('f-ifecha').value||new Date().toISOString().slice(0,10);
   if(!ns||!v){toast('Selecciona una S e ingresa el valor','err');return;}
+  const per=getPeriodoLiquidacion(f);
   const obj={id:uid(),numero_s:ns,fecha:f,valor:v,
     referencia:document.getElementById('f-iref').value.trim(),
     notas:document.getElementById('f-inotas').value.trim()};
@@ -921,7 +923,13 @@ async function guardarIngreso() {
     await spSaveIngreso(obj);
     DB.ingresos.push(obj);
   });
-  if(ok){closeModal();render();toast(`Recaudo ${fmt.format(v)} registrado para ${ns}`);}
+  if(ok){
+    closeModal();
+    window._searchIngresos=ns;
+    window._liqPer=per||window._liqPer;
+    navigate('ingresos');
+    toast(`Recaudo ${fmt.format(v)} registrado para ${ns} · Período ${per||'—'}`);
+  }
 }
 async function eliminarIngreso(id){
   if(!confirm('¿Eliminar este recaudo?'))return;
