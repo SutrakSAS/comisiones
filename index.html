@@ -791,7 +791,12 @@ async function guardarOrden(edit) {
     if(edit){const i=DB.ordenes.findIndex(o=>o.numero_s===ns);if(i>=0)DB.ordenes[i]=obj;}
     else DB.ordenes.push(obj);
   });
-  if(ok){closeModal();render();toast(edit?'Orden actualizada':`Orden ${ns} creada`);}
+  if(ok){
+    closeModal();
+    window._searchOrdenes=ns;
+    navigate('ordenes');
+    toast(edit?'Orden actualizada':`Orden ${ns} creada`);
+  }
 }
 function modalEditarOrden(ns){const o=DB.ordenes.find(o2=>o2.numero_s===ns);if(o)modalNuevaOrden(o);}
 async function eliminarOrden(ns){
