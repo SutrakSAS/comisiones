@@ -1022,7 +1022,7 @@ ${DB.asesores.filter(a=>a.activo).map(a=>{
 }
 
 function modalPagoComision(codigoPresel='') {
-  const per=(window._liqPer||DB.periodo_actual||'').slice(0,7);
+  const per=getPeriodoPagoDefault();
   showModal(`<h3>💰 REGISTRAR PAGO DE COMISIÓN</h3>
 <div class="form-grid">
   <div class="form-group" style="grid-column:1/-1"><label>Asesor</label>
@@ -1034,7 +1034,7 @@ function modalPagoComision(codigoPresel='') {
   <div class="form-group"><label>Valor Pagado</label>
     <input id="f-pvalor" type="number" placeholder="0"></div>
   <div class="form-group"><label>Período que cubre</label>
-    <input id="f-pperiodo" value="${per}" placeholder="2026-04"></div>
+    <input id="f-pperiodo" value="${per}" placeholder="2026-06-1"></div>
   <div class="form-group" style="grid-column:1/-1"><label>Notas / Referencia</label>
     <input id="f-pnotas" placeholder="Comprobante de pago..."></div>
 </div>
@@ -1168,18 +1168,28 @@ async function guardarPeriodoActual(periodo) {
 }
 
 function exportarLiquidacion(){
+  const periodos=getAllPeriodos();
+  const sel=getPeriodoSeleccionado(periodos);
   let csv='LIQUIDACIÓN DE COMISIONES — SUTRAK S.A.S\n';
-  csv+=`Período: ${DB.periodo_actual}\n\n`;
-  csv+='Asesor,Código,Tipo,N° Orden,Proyecto,%Dcto,%Comisión,Recaudado,Com. Generada,Com. Pagada,Pendiente,Estado\n';
+  csv+=`Período: ${sel} · ${getPeriodoLabel(sel)}\n\n`;
+  csv+='Asesor,Código,Tipo,N° Orden,Proyecto,Cliente,%Dcto,%Comisión,Recaudado,Com. Generada,Com. Pagada,Pendiente,Estado\n';
+  const ingP=DB.ingresos.filter(i=>getPeriodoLiquidacion(i.fecha)===sel);
   for(const a of DB.asesores.filter(a=>a.activo)){
     const ordenes=DB.ordenes.filter(o=>o.codigo_asesor===a.codigo);
-    if(a.tipo==='soporte'){const s=calcAsesorStats(a);csv+=`"${a.nombre}","${a.codigo}","Soporte","—","Base equipo","—","0.10%","${s.total_recaudado}","${s.comision_generada}","${s.comision_pagada}","${s.comision_pendiente}","${s.comision_pendiente<=0?'PAGADO':s.comision_pagada>0?'PARCIAL':'PENDIENTE'}"\n`;}
-    else{for(const o of ordenes){const os=calcOrdenStats(o);csv+=`"${a.nombre}","${a.codigo}","Directo","${o.numero_s}","${o.nombre_proyecto}","${fmtP(o.pct_dcto)}","${fmtP(os.pct_comision)}","${os.total_recaudado}","${os.comision_generada}","${os.comision_pagada}","${os.comision_pendiente}","${os.comision_pendiente<=0?'PAGADO':os.comision_pagada>0?'PARCIAL':'PENDIENTE'}"\n`;}}
+    if(a.tipo==='soporte'){const s=calcAsesorStatsPer(a,sel);csv+=`"${a.nombre}","${a.codigo}","Soporte","—","Base equipo","—","—","0.10%","${s.total_recaudado}","${s.comision_generada}","${s.comision_pagada}","${s.comision_pendiente}","${s.comision_pendiente<=0?'PAGADO':s.comision_pagada>0?'PARCIAL':'PENDIENTE'}"\n`;}
+    else{for(const o of ordenes){
+      const rec=ingP.filter(i=>i.numero_s===o.numero_s).reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+      if(rec===0)continue;
+      const com=rec*getPctComision(o.pct_dcto);
+      const pag=DB.pagos_comision.filter(p=>p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel)).reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
+      const pend=Math.max(0,com-pag);
+      csv+=`"${a.nombre}","${a.codigo}","Directo","${o.numero_s}","${o.nombre_proyecto}","${o.cliente||''}","${fmtP(o.pct_dcto)}","${fmtP(getPctComision(o.pct_dcto))}","${rec}","${com}","${pag}","${pend}","${pend<=0?'PAGADO':pag>0?'PARCIAL':'PENDIENTE'}"\n`;
+    }}
     csv+='\n';
   }
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`Comisiones_${DB.periodo_actual}.csv`;a.click();URL.revokeObjectURL(a.href);
+  a.download=`Comisiones_${sel}.csv`;a.click();URL.revokeObjectURL(a.href);
   toast('Liquidación exportada como CSV');
 }
 
@@ -1395,27 +1405,59 @@ function closeModal(){document.getElementById('modal-container').innerHTML='';}
 function getPeriodoLiquidacion(f) {
   if (!f) return null;
   var d=new Date(f+'T12:00:00'), m=d.getMonth()+1, y=d.getFullYear();
+  if (m===5 && d.getDate()>=24) return y+'-06-1';
+  if (m===6 && d.getDate()<=10) return y+'-06-1';
+  if (m===6 && d.getDate()<=23) return y+'-06-2';
   if (d.getDate()>=24){m++;if(m>12){m=1;y++;}}
   return y+'-'+String(m).padStart(2,'0');
 }
 var _ML=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function getPeriodoLabel(p){
   if(!p)return'—';
+  if(/^\d{4}-06-1$/.test(p)){var y1=+p.slice(0,4);return '24 May/'+y1+' — 10 Jun/'+y1;}
+  if(/^\d{4}-06-2$/.test(p)){var y2=+p.slice(0,4);return '11 Jun/'+y2+' — 23 Jun/'+y2;}
   var y=+p.slice(0,4),m=+p.slice(5,7),ma=m===1?12:m-1,ya=m===1?y-1:y;
   return '24 '+_ML[ma]+'/'+ya+' — 23 '+_ML[m]+'/'+y;
+}
+function addPeriodoMes(ps, periodo){
+  var p=(periodo||'').slice(0,7);
+  if(!/^\d{4}-\d{2}$/.test(p))return;
+  if(p.slice(5,7)==='06'){ps[p+'-1']=1;ps[p+'-2']=1;}
+  else ps[p]=1;
+}
+function getPeriodoPagoDefault(){
+  return window._liqPer||getPeriodoLiquidacion(new Date().toISOString().slice(0,10))||DB.periodo_actual||'';
+}
+function getPeriodoSeleccionado(periodos){
+  var sel=window._liqPer||getPeriodoLiquidacion(new Date().toISOString().slice(0,10))||DB.periodo_actual;
+  if(sel&&periodos.indexOf(sel)>=0)return sel;
+  if(sel&&sel.slice(5,7)==='06'){
+    var actual=getPeriodoLiquidacion(new Date().toISOString().slice(0,10));
+    if(actual&&actual.slice(0,7)===sel.slice(0,7)&&periodos.indexOf(actual)>=0)return actual;
+    if(periodos.indexOf(sel.slice(0,7)+'-2')>=0)return sel.slice(0,7)+'-2';
+    if(periodos.indexOf(sel.slice(0,7)+'-1')>=0)return sel.slice(0,7)+'-1';
+  }
+  return periodos[0]||sel;
+}
+function pagoEsDelPeriodo(pagoPeriodo, sel){
+  var per=(pagoPeriodo||'').trim();
+  if(!sel)return true;
+  if(per===sel)return true;
+  if(!/-[12]$/.test(sel)&&per.slice(0,7)===sel)return true;
+  return false;
 }
 function getAllPeriodos(){
   var ps={};
   DB.ingresos.forEach(function(i){var p=getPeriodoLiquidacion(i.fecha);if(p)ps[p]=1;});
-  DB.pagos_comision.forEach(function(p){var per=(p.periodo||'').slice(0,7);if(per)ps[per]=1;});
-  if(DB.periodo_actual)ps[DB.periodo_actual]=1;
+  DB.pagos_comision.forEach(function(p){if(p.periodo)ps[p.periodo]=1;});
+  addPeriodoMes(ps,DB.periodo_actual);
   return Object.keys(ps).sort().reverse();
 }
 
 // ════ calcAsesorStats CON FILTRO DE PERÍODO ══════════════════
 function calcAsesorStatsPer(asesor, per) {
   var ing = per ? DB.ingresos.filter(function(i){return getPeriodoLiquidacion(i.fecha)===per;}) : DB.ingresos;
-  var pags= per ? DB.pagos_comision.filter(function(p){return (p.periodo||'').slice(0,7)===per;}) : DB.pagos_comision;
+  var pags= per ? DB.pagos_comision.filter(function(p){return pagoEsDelPeriodo(p.periodo,per);}) : DB.pagos_comision;
   var ords= DB.ordenes.filter(function(o){return o.codigo_asesor===asesor.codigo;});
   var tr=0, cg=0;
   if (asesor.tipo==='soporte') {
@@ -1438,7 +1480,7 @@ function calcAsesorStatsPer(asesor, per) {
 // ════ LIQUIDACIÓN POR PERÍODO ════════════════════════════════
 function liquidacion() {
   var periodos=getAllPeriodos();
-  var sel=window._liqPer||periodos[0]||DB.periodo_actual;
+  var sel=getPeriodoSeleccionado(periodos);
   window._liqPer=sel;
   var ingP=DB.ingresos.filter(function(i){return getPeriodoLiquidacion(i.fecha)===sel;});
   var tRecD=ingP.filter(function(i){
@@ -1461,12 +1503,12 @@ function liquidacion() {
         +'<td class="center">0.10%</td><td class="num" style="color:var(--sutrak-teal)">'+fmt.format(tRecD*0.001)+'</td>'
         +'</tr></tbody></table>';
     } else {
-      var globalRest=DB.pagos_comision.filter(function(p){return p.codigo_asesor===a.codigo&&!p.numero_s&&(p.periodo||'').slice(0,7)===sel;}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
+      var globalRest=DB.pagos_comision.filter(function(p){return p.codigo_asesor===a.codigo&&!p.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
       var fls=s.ordenes.map(function(o){
         var rO=ingP.filter(function(i){return i.numero_s===o.numero_s;}).reduce(function(s2,i){return s2+(parseFloat(i.valor)||0);},0);
         if(rO===0) return '';
         var cG=rO*getPctComision(o.pct_dcto);
-        var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&(p.periodo||'').slice(0,7)===sel;}).reduce(function(s2,p){return s2+(parseFloat(p.valor)||0);},0);
+        var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s2,p){return s2+(parseFloat(p.valor)||0);},0);
         var cubiertoGlobal=Math.min(globalRest,Math.max(0,cG-cPDirect));
         globalRest-=cubiertoGlobal;
         var cP=cPDirect+cubiertoGlobal;
@@ -1532,7 +1574,7 @@ function liquidacion() {
     +'<div class="stat-card" style="--accent-color:'+(tPend>0?'var(--danger)':'var(--success)')+'"><div class="stat-label">Pendiente de Pago</div>'
     +'<div class="stat-value" style="font-size:1.2rem;color:'+(tPend>0?'var(--danger)':'var(--success)')+'">'+fmt.format(tPend)+'</div>'
     +'<div class="stat-sub">'+fmt.format(tP)+' ya pagados</div></div></div>'
-    +'<div class="alert alert-info">Período <strong>'+getPeriodoLabel(sel)+'</strong> — Recaudos entre el 24 del mes anterior y el 23 del mes actual.</div>'
+    +'<div class="alert alert-info">Período <strong>'+getPeriodoLabel(sel)+'</strong> — Recaudos del rango indicado.</div>'
     +bloques
     +'<div class="divider"></div><div class="card"><div class="card-title">RESUMEN — '+getPeriodoLabel(sel)+'</div>'
     +'<table><thead><tr><th>Asesor</th><th>Cód.</th>'
@@ -1552,13 +1594,13 @@ function buildPagosCierreAsesor(a, sel, fecha) {
   var nuevos=[];
   if(a.tipo==='directo'){
     var ords=DB.ordenes.filter(function(o){return o.codigo_asesor===a.codigo;});
-    var globalRest=DB.pagos_comision.filter(function(p){return p.codigo_asesor===a.codigo&&!p.numero_s&&(p.periodo||'').slice(0,7)===sel;}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
+    var globalRest=DB.pagos_comision.filter(function(p){return p.codigo_asesor===a.codigo&&!p.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
     for(var oi=0;oi<ords.length;oi++){
       var o=ords[oi];
       var rP=ingP.filter(function(i){return i.numero_s===o.numero_s;}).reduce(function(s,i){return s+(parseFloat(i.valor)||0);},0);
       if(rP===0) continue;
       var cG=rP*getPctComision(o.pct_dcto);
-      var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&(p.periodo||'').slice(0,7)===sel;}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
+      var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
       var cubiertoGlobal=Math.min(globalRest,Math.max(0,cG-cPDirect));
       globalRest-=cubiertoGlobal;
       var pendiente=Math.max(0,cG-cPDirect-cubiertoGlobal);
@@ -1572,7 +1614,7 @@ function buildPagosCierreAsesor(a, sel, fecha) {
 }
 
 async function cerrarLiqAsesor(codigo) {
-  var sel=window._liqPer||DB.periodo_actual;
+  var sel=getPeriodoSeleccionado(getAllPeriodos());
   var a=DB.asesores.find(function(x){return x.codigo===codigo;});
   if(!a){toast('Comercial no encontrado','err');return;}
   var s=calcAsesorStatsPer(a,sel);
@@ -1586,7 +1628,7 @@ async function cerrarLiqAsesor(codigo) {
 }
 
 async function cerrarLiq() {
-  var sel=window._liqPer;
+  var sel=getPeriodoSeleccionado(getAllPeriodos());
   var pends=DB.asesores.filter(function(a){return a.activo&&calcAsesorStatsPer(a,sel).comision_pendiente>0;});
   if(!pends.length){toast('Sin pendientes en este período','warn');return;}
   if(!confirm('Marcar PAGADO el saldo de '+pends.length+' asesor(es) para '+getPeriodoLabel(sel)+'?')) return;
