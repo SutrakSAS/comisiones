@@ -1406,7 +1406,7 @@ function getPeriodoLiquidacion(f) {
   if (!f) return null;
   var d=new Date(f+'T12:00:00'), m=d.getMonth()+1, y=d.getFullYear();
   if (m===5 && d.getDate()>=24) return y+'-06-1';
-  if (m===6 && d.getDate()<=10) return y+'-06-1';
+  if (m===6 && d.getDate()<=9) return y+'-06-1';
   if (m===6 && d.getDate()<=23) return y+'-06-2';
   if (d.getDate()>=24){m++;if(m>12){m=1;y++;}}
   return y+'-'+String(m).padStart(2,'0');
@@ -1414,8 +1414,8 @@ function getPeriodoLiquidacion(f) {
 var _ML=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function getPeriodoLabel(p){
   if(!p)return'—';
-  if(/^\d{4}-06-1$/.test(p)){var y1=+p.slice(0,4);return '24 May/'+y1+' — 10 Jun/'+y1;}
-  if(/^\d{4}-06-2$/.test(p)){var y2=+p.slice(0,4);return '11 Jun/'+y2+' — 23 Jun/'+y2;}
+  if(/^\d{4}-06-1$/.test(p)){var y1=+p.slice(0,4);return '24 May/'+y1+' — 09 Jun/'+y1;}
+  if(/^\d{4}-06-2$/.test(p)){var y2=+p.slice(0,4);return '10 Jun/'+y2+' — 23 Jun/'+y2;}
   var y=+p.slice(0,4),m=+p.slice(5,7),ma=m===1?12:m-1,ya=m===1?y-1:y;
   return '24 '+_ML[ma]+'/'+ya+' — 23 '+_ML[m]+'/'+y;
 }
