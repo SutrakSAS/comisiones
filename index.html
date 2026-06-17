@@ -430,6 +430,9 @@ function getPctComision(dcto) {
   return found.pct;
 }
 
+const IVA_RATE = 0.19;
+const RETENCION_ESTIMADA_RATE = 0.03;
+
 const EMPTY_DB = {asesores: ASESORES_DEFAULT, ordenes: [], ingresos: [], pagos_comision: [], liquidaciones: [], periodo_actual: new Date().toISOString().slice(0,7)};
 function normalizeDB(db) {
   const base = JSON.parse(JSON.stringify(EMPTY_DB));
@@ -458,16 +461,54 @@ function cloneDB(db) {
 // ═══════════════════════════════════════════════════════
 // BUSINESS LOGIC
 // ═══════════════════════════════════════════════════════
+function getValorAntesIva(orden) {
+  return parseFloat(orden?.valor_venta)||0;
+}
+function getValorConIva(orden) {
+  return getValorAntesIva(orden) * (1 + IVA_RATE);
+}
+function getRetencionEstimada(orden) {
+  return getValorAntesIva(orden) * RETENCION_ESTIMADA_RATE;
+}
+function getUmbralRecaudo(orden) {
+  return Math.max(0, getValorConIva(orden) - getRetencionEstimada(orden));
+}
+function getIngresosOrden(orden) {
+  return DB.ingresos
+    .filter(i => i.numero_s === orden.numero_s)
+    .sort((a,b) => ((a.fecha||'').localeCompare(b.fecha||'')) || ((a.id||'').localeCompare(b.id||'')));
+}
+function getBaseComisionableIngreso(orden, ingreso) {
+  const valorVenta = getValorAntesIva(orden);
+  let acumuladoPrevio = 0;
+  for (const i of getIngresosOrden(orden)) {
+    if (i === ingreso || (ingreso.id && i.id === ingreso.id)) break;
+    acumuladoPrevio += parseFloat(i.valor)||0;
+  }
+  return Math.max(0, Math.min(parseFloat(ingreso.valor)||0, valorVenta - acumuladoPrevio));
+}
+function getBaseComisionableOrden(orden, filtro) {
+  let total = 0;
+  for (const i of getIngresosOrden(orden)) {
+    if (!filtro || filtro(i)) total += getBaseComisionableIngreso(orden, i);
+  }
+  return total;
+}
 function calcOrdenStats(orden) {
-  const recaudos = DB.ingresos.filter(i => i.numero_s === orden.numero_s);
+  const recaudos = getIngresosOrden(orden);
   const total_recaudado = recaudos.reduce((s,i) => s+(parseFloat(i.valor)||0), 0);
+  const base_comisionable = getBaseComisionableOrden(orden);
   const pct_com = getPctComision(orden.pct_dcto);
-  const comision_generada = total_recaudado * pct_com;
+  const comision_generada = base_comisionable * pct_com;
   const pagos_s = DB.pagos_comision.filter(p => p.numero_s === orden.numero_s);
   const comision_pagada = pagos_s.reduce((s,p) => s+(parseFloat(p.valor)||0), 0);
   return {
     total_recaudado,
-    pendiente_recaudo: Math.max(0,(parseFloat(orden.valor_venta)||0) - total_recaudado),
+    base_comisionable,
+    valor_con_iva: getValorConIva(orden),
+    retencion_estimada: getRetencionEstimada(orden),
+    umbral_recaudo: getUmbralRecaudo(orden),
+    pendiente_recaudo: Math.max(0,getUmbralRecaudo(orden) - total_recaudado),
     pct_comision: pct_com, comision_generada,
     comision_pagada, comision_pendiente: Math.max(0, comision_generada - comision_pagada),
     recaudos,
@@ -478,13 +519,15 @@ function calcAsesorStats(asesor) {
   const ordenes = DB.ordenes.filter(o => o.codigo_asesor === asesor.codigo);
   let total_recaudado = 0, comision_generada = 0;
   if (asesor.tipo === 'soporte') {
-    // 0.1% of all direct asesor recaudos
+    // 0.1% of the commissionable base from all direct asesor recaudos.
     const totalDirecto = DB.ingresos.filter(i => {
       const o = DB.ordenes.find(o2 => o2.numero_s === i.numero_s);
       return o && DB.asesores.find(a => a.codigo===o.codigo_asesor && a.tipo==='directo');
     }).reduce((s,i) => s+(parseFloat(i.valor)||0), 0);
+    const baseDirecto = DB.ordenes.filter(o => DB.asesores.find(a => a.codigo===o.codigo_asesor && a.tipo==='directo'))
+      .reduce((s,o) => s+getBaseComisionableOrden(o), 0);
     total_recaudado = totalDirecto;
-    comision_generada = totalDirecto * 0.001;
+    comision_generada = baseDirecto * 0.001;
   } else {
     for (const o of ordenes) {
       const s = calcOrdenStats(o);
@@ -734,7 +777,7 @@ ${filtradas.length===0?`<div class="empty-state"><div class="icon">📋</div><p>
       <td class="num" style="color:var(--warn)">${fmt.format(s.pendiente_recaudo)}</td>
       <td class="num" style="color:var(--sutrak-teal)">${fmt.format(s.comision_generada)}</td>
       <td class="num text-success">${fmt.format(s.comision_pagada)}</td>
-      <td>${statusRecaudo(s.total_recaudado,v)}</td>
+      <td>${statusRecaudo(s.total_recaudado,s.umbral_recaudo)}</td>
       <td>${statusCom(s.comision_pagada,s.comision_generada)}</td>
       <td><div class="flex-row" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="verDetalleOrden('${o.numero_s}')">👁</button>
@@ -814,13 +857,15 @@ async function eliminarOrden(ns){
 function verDetalleOrden(ns){
   const o=DB.ordenes.find(o2=>o2.numero_s===ns);if(!o)return;
   const s=calcOrdenStats(o);const a=DB.asesores.find(a2=>a2.codigo===o.codigo_asesor);
-  const pctR=parseFloat(o.valor_venta)>0?Math.min(1,s.total_recaudado/parseFloat(o.valor_venta)):0;
+  const pctR=s.umbral_recaudo>0?Math.min(1,s.total_recaudado/s.umbral_recaudo):0;
   showModal(`<h3>📋 ${o.numero_s} — ${o.nombre_proyecto}</h3>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
   <div class="liq-asesor"><div class="section-label">Cliente</div><div style="font-weight:700">${o.cliente||'—'}</div></div>
   <div class="liq-asesor"><div class="section-label">Asesor</div><div style="font-weight:700">${a?.nombre||o.codigo_asesor}</div><span class="chip">${o.codigo_asesor}</span></div>
   <div class="liq-asesor"><div class="section-label">Valor Venta (sin IVA)</div><div style="font-family:var(--bebas);font-size:1.2rem">${fmt.format(o.valor_venta)}</div></div>
   <div class="liq-asesor"><div class="section-label">Descuento → Comisión</div><div style="font-family:monospace">${fmtP(o.pct_dcto)} → <strong style="color:var(--sutrak-teal)">${fmtP(s.pct_comision)}</strong></div></div>
+  <div class="liq-asesor"><div class="section-label">Total con IVA</div><div style="font-family:var(--bebas);font-size:1.1rem">${fmt.format(s.valor_con_iva)}</div></div>
+  <div class="liq-asesor"><div class="section-label">Umbral con retención máx. 3%</div><div style="font-family:var(--bebas);font-size:1.1rem">${fmt.format(s.umbral_recaudo)}</div></div>
 </div>
 <div class="section-label">RECAUDO</div>
 <div class="progress-wrap" style="margin-bottom:5px"><div class="progress-bar" style="width:${(pctR*100).toFixed(1)}%"></div></div>
@@ -830,7 +875,8 @@ function verDetalleOrden(ns){
   <span>Pendiente: ${fmt.format(s.pendiente_recaudo)}</span>
 </div>
 <div class="section-label">COMISIÓN GENERADA</div>
-<div style="font-family:var(--bebas);font-size:1.4rem;color:var(--sutrak-teal);margin-bottom:14px">${fmt.format(s.comision_generada)}</div>
+<div style="font-family:var(--bebas);font-size:1.4rem;color:var(--sutrak-teal);margin-bottom:4px">${fmt.format(s.comision_generada)}</div>
+<div class="text-muted" style="font-size:0.78rem;margin-bottom:14px">Base comisionable: ${fmt.format(s.base_comisionable)} / ${fmt.format(o.valor_venta)}</div>
 ${s.recaudos.length>0?`
 <div class="section-label">DETALLE RECAUDOS</div>
 <table style="margin-bottom:14px">
@@ -882,7 +928,7 @@ ${filtrados.length===0?`<div class="empty-state"><div class="icon">💳</div><p>
   <th style="text-align:right">Valor Recaudado</th><th style="text-align:right">Comisión Causada</th><th>Referencia</th><th></th></tr></thead>
   <tbody>
   ${filtrados.map(i=>{const o=DB.ordenes.find(o2=>o2.numero_s===i.numero_s);const a=o?DB.asesores.find(a2=>a2.codigo===o.codigo_asesor):null;
-    const pct=o?getPctComision(o.pct_dcto):0;const com=(parseFloat(i.valor)||0)*pct;
+    const pct=o?getPctComision(o.pct_dcto):0;const base=o?getBaseComisionableIngreso(o,i):0;const com=base*pct;
     return`<tr>
       <td style="font-size:0.76rem">${fmtD(i.fecha)}</td>
       <td><span class="chip">${getPeriodoLiquidacion(i.fecha)||'—'}</span></td>
@@ -907,7 +953,7 @@ function modalNuevoIngreso(ns_ini='') {
     ${DB.ordenes.map(o=>`<option value="${o.numero_s}" ${o.numero_s===ns?'selected':''}>${o.numero_s} — ${o.nombre_proyecto}</option>`).join('')}</select></div>
   <div class="form-group"><label>Fecha del recaudo</label>
     <input id="f-ifecha" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-  <div class="form-group"><label>Valor Recaudado (sin IVA)</label>
+  <div class="form-group"><label>Valor Recaudado</label>
     <input id="f-ivalor" type="number" placeholder="0"></div>
   <div class="form-group"><label>Referencia / Comprobante</label>
     <input id="f-iref" placeholder="ANTICIPO / FE14258 / RC-1234"></div>
@@ -1180,7 +1226,8 @@ function exportarLiquidacion(){
     else{for(const o of ordenes){
       const rec=ingP.filter(i=>i.numero_s===o.numero_s).reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
       if(rec===0)continue;
-      const com=rec*getPctComision(o.pct_dcto);
+      const base=getBaseComisionableOrden(o,i=>getPeriodoLiquidacion(i.fecha)===sel);
+      const com=base*getPctComision(o.pct_dcto);
       const pag=DB.pagos_comision.filter(p=>p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel)).reduce((s,p)=>s+(parseFloat(p.valor)||0),0);
       const pend=Math.max(0,com-pag);
       csv+=`"${a.nombre}","${a.codigo}","Directo","${o.numero_s}","${o.nombre_proyecto}","${o.cliente||''}","${fmtP(o.pct_dcto)}","${fmtP(getPctComision(o.pct_dcto))}","${rec}","${com}","${pag}","${pend}","${pend<=0?'PAGADO':pag>0?'PARCIAL':'PENDIENTE'}"\n`;
@@ -1465,12 +1512,15 @@ function calcAsesorStatsPer(asesor, per) {
       var o=DB.ordenes.find(function(o2){return o2.numero_s===i.numero_s;});
       return o&&DB.asesores.find(function(a){return a.codigo===o.codigo_asesor&&a.tipo==='directo';});
     }).reduce(function(s,i){return s+(parseFloat(i.valor)||0);},0);
-    tr=td; cg=td*0.001;
+    var bd=DB.ordenes.filter(function(o){return DB.asesores.find(function(a){return a.codigo===o.codigo_asesor&&a.tipo==='directo';});})
+      .reduce(function(s,o){return s+getBaseComisionableOrden(o,function(i){return getPeriodoLiquidacion(i.fecha)===per;});},0);
+    tr=td; cg=bd*0.001;
   } else {
     for(var i=0;i<ords.length;i++){
       var o=ords[i];
       var r=ing.filter(function(x){return x.numero_s===o.numero_s;}).reduce(function(s,x){return s+(parseFloat(x.valor)||0);},0);
-      tr+=r; cg+=r*getPctComision(o.pct_dcto);
+      var b=getBaseComisionableOrden(o,function(x){return getPeriodoLiquidacion(x.fecha)===per;});
+      tr+=r; cg+=b*getPctComision(o.pct_dcto);
     }
   }
   var cp=pags.filter(function(p){return p.codigo_asesor===asesor.codigo;}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
@@ -1507,7 +1557,8 @@ function liquidacion() {
       var fls=s.ordenes.map(function(o){
         var rO=ingP.filter(function(i){return i.numero_s===o.numero_s;}).reduce(function(s2,i){return s2+(parseFloat(i.valor)||0);},0);
         if(rO===0) return '';
-        var cG=rO*getPctComision(o.pct_dcto);
+        var baseO=getBaseComisionableOrden(o,function(i){return getPeriodoLiquidacion(i.fecha)===sel;});
+        var cG=baseO*getPctComision(o.pct_dcto);
         var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s2,p){return s2+(parseFloat(p.valor)||0);},0);
         var cubiertoGlobal=Math.min(globalRest,Math.max(0,cG-cPDirect));
         globalRest-=cubiertoGlobal;
@@ -1599,7 +1650,8 @@ function buildPagosCierreAsesor(a, sel, fecha) {
       var o=ords[oi];
       var rP=ingP.filter(function(i){return i.numero_s===o.numero_s;}).reduce(function(s,i){return s+(parseFloat(i.valor)||0);},0);
       if(rP===0) continue;
-      var cG=rP*getPctComision(o.pct_dcto);
+      var baseP=getBaseComisionableOrden(o,function(i){return getPeriodoLiquidacion(i.fecha)===sel;});
+      var cG=baseP*getPctComision(o.pct_dcto);
       var cPDirect=DB.pagos_comision.filter(function(p){return p.numero_s===o.numero_s&&pagoEsDelPeriodo(p.periodo,sel);}).reduce(function(s,p){return s+(parseFloat(p.valor)||0);},0);
       var cubiertoGlobal=Math.min(globalRest,Math.max(0,cG-cPDirect));
       globalRest-=cubiertoGlobal;
