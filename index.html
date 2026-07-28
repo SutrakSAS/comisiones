@@ -1606,17 +1606,15 @@ function liquidacion() {
           +'<td class="center" style="font-size:0.78rem;color:var(--sutrak-teal)">'+fmtP(getPctComision(o.pct_dcto))+'</td>'
           +'<td class="num text-success">'+fmt.format(rO)+'</td>'
           +'<td class="num" style="color:var(--sutrak-teal)">'+fmt.format(cG)+'</td>'
-          +'<td class="num text-success">'+fmt.format(cP)+'</td>'
           +'<td class="num" style="font-weight:700;color:'+(cPd>0?'var(--danger)':'var(--success)')+'">'+fmt.format(cPd)+'</td>'
           +'<td>'+statusCom(cP,cG)+'</td></tr>';
       }).join('');
       inner='<div class="table-wrap"><table><thead><tr><th>S</th><th>Proyecto</th><th>Cliente</th><th>%Dcto</th><th>%Com</th>'
         +'<th style="text-align:right">Recaudado</th><th style="text-align:right">Com.Gen.</th>'
-        +'<th style="text-align:right">Com.Pag.</th><th style="text-align:right">Pendiente</th><th>Estado</th></tr></thead>'
+        +'<th style="text-align:right">Pendiente</th><th>Estado</th></tr></thead>'
         +'<tbody>'+fls+'</tbody>'
         +'<tfoot><tr><td colspan="5">TOTAL '+a.nombre.toUpperCase()+'</td>'
         +'<td class="num">'+fmt.format(s.total_recaudado)+'</td><td class="num">'+fmt.format(s.comision_generada)+'</td>'
-        +'<td class="num">'+fmt.format(s.comision_pagada)+'</td>'
         +'<td class="num" style="font-weight:700;color:'+(s.comision_pendiente>0?'var(--danger)':'var(--success)')+'">'+fmt.format(s.comision_pendiente)+'</td>'
         +'<td>'+statusCom(s.comision_pagada,s.comision_generada)+'</td></tr></tfoot></table></div>';
     }
@@ -1626,8 +1624,7 @@ function liquidacion() {
       +'<span class="badge '+(a.tipo==='soporte'?'badge-teal':'badge-gray')+'">'+a.tipo+'</span></div></div>'
       +'<div style="text-align:right"><div class="section-label">COMISIÓN DEL PERÍODO</div>'
       +'<div style="font-family:var(--bebas);font-size:1.4rem;color:var(--sutrak-teal)">'+fmt.format(s.comision_generada)+'</div>'
-      +'<div style="font-size:0.75rem;color:var(--muted)">Pagado: '+fmt.format(s.comision_pagada)
-      +' · <strong style="color:'+(s.comision_pendiente>0?'var(--danger)':'var(--success)')+'">Pend: '+fmt.format(s.comision_pendiente)+'</strong></div>'
+      +'<div style="font-size:0.75rem;color:var(--muted)"><strong style="color:'+(s.comision_pendiente>0?'var(--danger)':'var(--success)')+'">Pend: '+fmt.format(s.comision_pendiente)+'</strong></div>'
       +(s.comision_pendiente>1?'<button class="btn btn-success btn-sm" style="margin-top:8px" onclick="cerrarLiqAsesor(\''+a.codigo+'\')">&#10003; PAGAR COMERCIAL</button>':'')
       +'</div></div>'+inner+'</div>';
   }).join('');
@@ -1637,7 +1634,6 @@ function liquidacion() {
     return '<tr><td style="font-weight:700">'+a.nombre+'</td><td><span class="chip">'+a.codigo+'</span></td>'
       +'<td class="num text-success">'+fmt.format(s.total_recaudado)+'</td>'
       +'<td class="num" style="color:var(--sutrak-teal)">'+fmt.format(s.comision_generada)+'</td>'
-      +'<td class="num text-success">'+fmt.format(s.comision_pagada)+'</td>'
       +'<td class="num" style="font-weight:700;color:'+(s.comision_pendiente>0?'var(--danger)':'var(--success)')+'">'+fmt.format(s.comision_pendiente)+'</td>'
       +'<td>'+statusCom(s.comision_pagada,s.comision_generada)+'</td></tr>';
   }).join('');
@@ -1658,17 +1654,17 @@ function liquidacion() {
     +'<div class="stat-sub">por recaudos del período</div></div>'
     +'<div class="stat-card" style="--accent-color:'+(tPend>0?'var(--danger)':'var(--success)')+'"><div class="stat-label">Pendiente de Pago</div>'
     +'<div class="stat-value" style="font-size:1.2rem;color:'+(tPend>0?'var(--danger)':'var(--success)')+'">'+fmt.format(tPend)+'</div>'
-    +'<div class="stat-sub">'+fmt.format(tP)+' ya pagados</div></div></div>'
+    +'<div class="stat-sub">saldo estimado del periodo</div></div></div>'
     +'<div class="alert alert-info">Período <strong>'+getPeriodoLabel(sel)+'</strong> — Recaudos del rango indicado.</div>'
     +bloques
     +'<div class="divider"></div><div class="card"><div class="card-title">RESUMEN — '+getPeriodoLabel(sel)+'</div>'
     +'<table><thead><tr><th>Asesor</th><th>Cód.</th>'
     +'<th style="text-align:right">Recaudado</th><th style="text-align:right">Com.Gen.</th>'
-    +'<th style="text-align:right">Com.Pag.</th><th style="text-align:right">Pendiente</th><th>Estado</th></tr></thead>'
+    +'<th style="text-align:right">Pendiente</th><th>Estado</th></tr></thead>'
     +'<tbody>'+rRes+'</tbody>'
     +'<tfoot><tr><td colspan="2">TOTAL</td>'
     +'<td class="num">'+fmt.format(DB.asesores.filter(function(a){return a.activo;}).reduce(function(s,a){return s+calcAsesorStatsPer(a,sel).total_recaudado;},0))+'</td>'
-    +'<td class="num">'+fmt.format(tG)+'</td><td class="num">'+fmt.format(tP)+'</td>'
+    +'<td class="num">'+fmt.format(tG)+'</td>'
     +'<td class="num" style="color:'+(tPend>0?'var(--danger)':'var(--success)')+'">'+fmt.format(tPend)+'</td>'
     +'<td></td></tr></tfoot></table></div>';
 }
